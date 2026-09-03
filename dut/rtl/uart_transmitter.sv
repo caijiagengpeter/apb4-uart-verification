@@ -50,7 +50,7 @@ module uart_transmitter #(
         START_BIT,
         DATA_BITS,
         PARITY_BIT,
-        STOP_BITS
+        STOP_STATE
     } tx_state_t;
     
     // Internal signals
@@ -169,18 +169,18 @@ module uart_transmitter #(
                     if (PARITY_ENABLE) begin
                         tx_next_state = PARITY_BIT;
                     end else begin
-                        tx_next_state = STOP_BITS;
+                        tx_next_state = STOP_STATE;
                     end
                 end
             end
             
             PARITY_BIT: begin
                 if (bit_tick) begin
-                    tx_next_state = STOP_BITS;
+                    tx_next_state = STOP_STATE;
                 end
             end
             
-            STOP_BITS: begin
+            STOP_STATE: begin
                 if (bit_tick && (frame_counter == FRAME_BITS - 1)) begin
                     tx_next_state = IDLE;
                 end
