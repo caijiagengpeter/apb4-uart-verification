@@ -1,0 +1,5 @@
+{"vcs1":{"timestamp_begin":1788408287.929334733, "rt":2.27, "ut":0.03, "st":0.18}}
+{"SNPS_VCS_INTERNAL_ROOT_START_TIME": 1788408287.773939198}
+{"VCS_COMP_START_TIME": 1788408287.773939198}
+{"VCS_COMP_END_TIME": 1788408290.226339428}
+{"VCS_USER_OPTIONS": "-full64 -full64 -full64 -sverilog dut/rtl/sync_fifo.sv dut/rtl/uart_transmitter.sv dut/rtl/uart_receiver.sv dut/rtl/uart_controller.sv -top uart_controller -o simv"}

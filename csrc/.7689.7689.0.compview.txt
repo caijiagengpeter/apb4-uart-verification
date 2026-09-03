@@ -1,0 +1,9 @@
+{"vcs1":{"timestamp_begin":1788404751.543999297, "rt":1.47, "ut":0.10, "st":0.20}}
+{"vcselab":{"timestamp_begin":1788404753.053936642, "rt":1.39, "ut":0.11, "st":0.09}}
+{"link":{"timestamp_begin":1788404754.475827037, "rt":0.09, "ut":0.06, "st":0.00}}
+{"SNPS_VCS_INTERNAL_ROOT_START_TIME": 1788404751.378555795}
+{"VCS_COMP_START_TIME": 1788404751.378555795}
+{"VCS_COMP_END_TIME": 1788404754.610002521}
+{"VCS_USER_OPTIONS": "-full64 -full64 -full64 -sverilog dut/rtl/sync_fifo.sv dut/rtl/uart_transmitter.sv dut/rtl/uart_receiver.sv dut/rtl/uart_controller.sv -top uart_controller -o simv"}
+{"vcs1": {"peak_mem": 581892}}
+{"vcselab": {"peak_mem": 391132}}
