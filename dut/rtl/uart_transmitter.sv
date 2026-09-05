@@ -12,7 +12,7 @@
 // - Busy status indication
 // - Automatic transmission timing
 //
-// Author: shivaram@vyges.com
+// Author: shivaram@vyges.com (Fixed ver.)
 // License: Apache-2.0
 //=============================================================================
 
@@ -41,7 +41,9 @@ module uart_transmitter #(
     // Local parameters
     localparam int BAUD_DIVIDER = CLOCK_FREQUENCY / BAUD_RATE;
     localparam int BIT_COUNTER_WIDTH = $clog2(BAUD_DIVIDER);
-    localparam int FRAME_BITS = DATA_WIDTH + STOP_BITS + (PARITY_ENABLE ? 1 : 0);
+    
+    // [修复] 加上 1 个起始位(Start Bit)，修正总帧长度
+    localparam int FRAME_BITS = 1 + DATA_WIDTH + (PARITY_ENABLE ? 1 : 0) + STOP_BITS; 
     localparam int FRAME_COUNTER_WIDTH = $clog2(FRAME_BITS);
     
     // State machine states
@@ -64,7 +66,9 @@ module uart_transmitter #(
     
     // Output assignments
     assign busy_o = (tx_state != IDLE);
-    assign tx_o = (tx_state == IDLE) ? 1'b1 : tx_frame[0];
+    
+    // [修复] TXD 应当随 frame_counter 逐 bit 输出
+    assign tx_o = (tx_state == IDLE) ? 1'b1 : tx_frame[frame_counter];
     
     // Baud rate counter
     always_ff @(posedge clk_i or negedge reset_n_i) begin
@@ -130,14 +134,26 @@ module uart_transmitter #(
     
     // Frame construction
     always_comb begin
-        tx_frame = '1; // Default to idle state
+        // [修复] 匹配正确的 FRAME_BITS 宽度（去掉了原本多余的最高位1'b1避免截断错误）
         if (PARITY_ENABLE) begin
-            tx_frame = {1'b1, {STOP_BITS{1'b1}}, parity_bit, tx_data_reg, 1'b0};
+            tx_frame = {{STOP_BITS{1'b1}}, parity_bit, tx_data_reg, 1'b0};
         end else begin
-            tx_frame = {1'b1, {STOP_BITS{1'b1}}, tx_data_reg, 1'b0};
+            tx_frame = {{STOP_BITS{1'b1}}, tx_data_reg, 1'b0};
         end
     end
     
+    // Debugging (保留了你原来的打印逻辑，调整了缩进)
+    /*
+    always @(posedge clk_i) begin
+        if (tx_state != IDLE) begin
+            $display("[%0t] TX STATE=%s bit_counter=%0d frame_counter=%0d tx_frame=%b TXD=%b",
+                     $time, tx_state.name(), bit_counter, frame_counter, tx_frame, tx_o);
+        end
+        $display("[%0t] TX STATE=%s frame_counter=%0d tx_data_reg=%h tx_frame=%b tx_frame_cur=%b TXD=%b",
+                 $time, tx_state.name(), frame_counter, tx_data_reg, tx_frame, tx_frame[frame_counter], tx_o);
+    end
+    */
+
     // State machine
     always_ff @(posedge clk_i or negedge reset_n_i) begin
         if (!reset_n_i) begin
@@ -165,7 +181,8 @@ module uart_transmitter #(
             end
             
             DATA_BITS: begin
-                if (bit_tick && (frame_counter == DATA_WIDTH - 1)) begin
+                // [修复] 由于 frame_counter 为 0 时是 START 位，所以第8位数据发出时 frame_counter 为 DATA_WIDTH 
+                if (bit_tick && (frame_counter == DATA_WIDTH)) begin
                     if (PARITY_ENABLE) begin
                         tx_next_state = PARITY_BIT;
                     end else begin
@@ -181,6 +198,7 @@ module uart_transmitter #(
             end
             
             STOP_STATE: begin
+                // 这里刚好等到发送完所有的 FRAME_BITS
                 if (bit_tick && (frame_counter == FRAME_BITS - 1)) begin
                     tx_next_state = IDLE;
                 end
@@ -192,4 +210,4 @@ module uart_transmitter #(
         endcase
     end
 
-endmodule 
+endmodule

@@ -198,7 +198,13 @@ module uart_receiver #(
 
             else if (bit_tick) begin
 
-                if (frame_counter == FRAME_BITS - 1) begin
+                // START bit finished:
+                // begin DATA_BITS with DATA[0]
+                if (rx_state == START_BIT) begin
+                    frame_counter <= '0;
+                end
+
+                else if (frame_counter == FRAME_BITS - 1) begin
                     frame_counter <= '0;
                 end
 
@@ -227,12 +233,24 @@ module uart_receiver #(
         else begin
 
             if (sample_tick && (rx_state == DATA_BITS)) begin
-                rx_data_reg <= {
-                    rx_sync,
-                    rx_data_reg[DATA_WIDTH-1:1]
-                };
-            end
 
+    $display(
+        "[%0t] RX SAMPLE: frame_cnt=%0d rx_sync=%b rx_data_reg_before=0x%02h",
+        $time,
+        frame_counter,
+        rx_sync,
+        rx_data_reg
+    );
+
+    rx_data_reg <= {
+        rx_sync,
+        rx_data_reg[DATA_WIDTH-1:1]
+    };
+
+end
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////DEBUG !!!!!!!!!!
         end
     end
 
@@ -246,7 +264,7 @@ module uart_receiver #(
         end
         else begin
 
-            // Sample parity bit
+            // Sample parity bit()////////////////////////////////////////////////////////////
             if (sample_tick && (rx_state == PARITY_BIT)) begin
                 parity_bit <= rx_sync;
             end

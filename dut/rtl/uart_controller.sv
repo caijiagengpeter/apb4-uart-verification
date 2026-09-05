@@ -174,6 +174,8 @@ module uart_controller #(
     // PSTRB[2] -> PWDATA[23:16]
     // PSTRB[3] -> PWDATA[31:24]
     //=========================================================================
+    assign pready_o = psel_i && penable_i;
+
     always_ff @(posedge pclk_i or negedge presetn_i) begin
         if (!presetn_i) begin
             ctrl_reg  <= 32'h0;
@@ -183,17 +185,13 @@ module uart_controller #(
             txdata_reg <= 8'h0;
 
             prdata_o  <= 32'h0;
-            pready_o  <= 1'b0;
+
             pslverr_o <= 1'b0;
         end
         else begin
-            pready_o  <= 1'b0;
             pslverr_o <= 1'b0;
 
             if (psel_i && penable_i) begin
-
-                // APB transaction completes immediately
-                pready_o <= 1'b1;
 
                 //=================================================================
                 // Write transaction
