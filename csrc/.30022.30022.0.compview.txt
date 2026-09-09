@@ -1,9 +1,0 @@
-{"vcs1":{"timestamp_begin":1788492173.048141685, "rt":1.83, "ut":0.12, "st":0.16}}
-{"vcselab":{"timestamp_begin":1788492174.917541763, "rt":1.92, "ut":0.13, "st":0.05}}
-{"link":{"timestamp_begin":1788492176.866399667, "rt":0.07, "ut":0.06, "st":0.01}}
-{"SNPS_VCS_INTERNAL_ROOT_START_TIME": 1788492172.893167597}
-{"VCS_COMP_START_TIME": 1788492172.893167597}
-{"VCS_COMP_END_TIME": 1788492176.974094297}
-{"VCS_USER_OPTIONS": "-full64 -full64 -sverilog dut/rtl/sync_fifo.sv dut/rtl/uart_transmitter.sv dut/rtl/uart_receiver.sv dut/rtl/uart_controller.sv tb/tb_top.sv -top tb_top -o simv"}
-{"vcs1": {"peak_mem": 581892}}
-{"vcselab": {"peak_mem": 391128}}

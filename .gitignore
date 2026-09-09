@@ -1,0 +1,22 @@
+# VCS build outputs
+csrc/
+simv
+simv.daidir/
+ucli.key
+vc_hdrs.h
+
+# Verdi / FSDB outputs
+wave.fsdb
+verdiLog/
+novas.conf
+novas.rc
+novas_dump.log
+verdi_config_file
+
+# Simulation logs / databases
+tr_db.log
+*.log
+*.vpd
+
+# Misc
+.DVEfiles/
