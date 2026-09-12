@@ -23,7 +23,8 @@ package apb_pkg;
     // Sequences
     `include "apb_smoke_sequence.sv"
     `include "uart_tx_smoke_sequence.sv"
-    `include "uart_rx_smoke_sequence.sv"
+    //`include "uart_rx_smoke_sequence.sv"
+    `include "apb_rx_enable.sv"
     `include "uart_send_sequence.sv"
     `include "apb_read_sequence.sv"
     `include "uart_tx_multi_sequence.sv"

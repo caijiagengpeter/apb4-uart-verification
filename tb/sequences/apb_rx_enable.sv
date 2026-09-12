@@ -1,19 +1,19 @@
-`ifndef UART_RX_SMOKE_SEQUENCE_SV
-`define UART_RX_SMOKE_SEQUENCE_SV
+`ifndef APB_RX_ENABLE_SV
+`define APB_RX_ENABLE_SV
 
-class uart_rx_smoke_sequence extends apb_sequence;
+class apb_rx_enable extends apb_sequence;
 
-    `uvm_object_utils(uart_rx_smoke_sequence)
+    `uvm_object_utils(apb_rx_enable)
 
-    function new(string name = "uart_rx_smoke_sequence");
+    function new(string name = "apb_rx_enable");
         super.new(name);
     endfunction
 
     task body();
 
         `uvm_info(
-            "UART_RX_SMOKE_SEQ",
-            "Starting UART RX smoke sequence",
+            "APB_RX_ENABLE",
+            "Starting APB RX enable sequence",
             UVM_MEDIUM
         )
 

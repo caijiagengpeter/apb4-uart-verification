@@ -6,7 +6,9 @@ class uart_driver extends uvm_driver #(uart_item);
     `uvm_component_utils(uart_driver)
 
     virtual uart_if.DRIVER vif;
-
+///////////////////////////////////////////////conner case
+    int unsigned inter_frame_gap_bits = 0;
+///////////////////////////////////////////////
     localparam int CLKS_PER_BIT = 50_000_000 / 115_200;
 
     function new(
@@ -22,12 +24,17 @@ class uart_driver extends uvm_driver #(uart_item);
         super.build_phase(phase);
 
         if (!uvm_config_db#(virtual uart_if.DRIVER)::get(
-                this, "", "vif", vif)) begin
+                this, "", "vif", vif))
+            `uvm_fatal("UART_DRIVER", "Failed to get virtual interface")
 
-            `uvm_fatal(
-                "UART_DRIVER",
-                "Failed to get virtual interface"
-            )
+        if (!uvm_config_db#(int unsigned)::get(
+                this,
+                "",
+                "inter_frame_gap_bits",
+                inter_frame_gap_bits
+            )) begin
+
+            inter_frame_gap_bits = 0;
 
         end
 
@@ -58,34 +65,33 @@ class uart_driver extends uvm_driver #(uart_item);
 
     task drive_uart(uart_item req);
 
-        // idle
         vif.rx <= 1'b1;
 
-        // start bit
+        // start
         vif.rx <= 1'b0;
         wait_bit_time();
 
-        // 8 data bits, LSB first
+        // data
         for (int i = 0; i < 8; i++) begin
             vif.rx <= req.data[i];
             wait_bit_time();
         end
 
-        // stop bit
+        // stop
         vif.rx <= 1'b1;
         wait_bit_time();
 
         `uvm_info(
             "UART_DRIVER",
-            $sformatf(
-                "Driving UART with data: 0x%02h",
-                req.data
-            ),
+            $sformatf("Driving UART with data: 0x%02h", req.data),
             UVM_MEDIUM
         )
 
-    endtask
+        // extra idle gap, only between frames
+        repeat (CLKS_PER_BIT * inter_frame_gap_bits)
+            @(posedge vif.clk);
 
+    endtask
 
     task wait_bit_time();
 
