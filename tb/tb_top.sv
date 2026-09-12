@@ -134,15 +134,23 @@ module tb_top;
             uart_vif
         );
 
-        // UART Monitor
+        // UART TX Monitor
         uvm_config_db#(virtual uart_if.MONITOR)::set(
             null,
-            "uvm_test_top.env.uart_agt.monitor",
+            "uvm_test_top.env.uart_agt.tx_monitor",
             "vif",
             uart_vif
         );
 
-        run_test("uart_test");
+        // UART RX Monitor
+        uvm_config_db#(virtual uart_if.MONITOR)::set(
+            null,
+            "uvm_test_top.env.uart_agt.rx_monitor",
+            "vif",
+            uart_vif
+        );
+
+        run_test("uart_rx_test");
 
     end
 

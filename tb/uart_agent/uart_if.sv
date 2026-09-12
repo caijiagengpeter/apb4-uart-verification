@@ -16,8 +16,11 @@ interface uart_if(input logic clk);
     modport MONITOR (
         input clk,
         input rst_n,
-        input tx
+        input tx,
+        input rx
     );
+
+
 
 endinterface
 

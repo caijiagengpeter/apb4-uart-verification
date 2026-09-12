@@ -1,12 +1,9 @@
 `ifndef APB_TEST_SV
 `define APB_TEST_SV
 
-class apb_test extends uvm_test;
+class apb_test extends tb_base_test;
 
     `uvm_component_utils(apb_test)
-
-    tb_env env;
-
 
     function new(
         string name = "apb_test",
@@ -17,26 +14,13 @@ class apb_test extends uvm_test;
 
     endfunction
 
-
-    function void build_phase(uvm_phase phase);
-
-        super.build_phase(phase);
-
-        env = tb_env::type_id::create(
-            "env",
-            this
-        );
-
-    endfunction
-
-
     task run_phase(uvm_phase phase);
 
-        uart_rx_smoke_sequence seq;
+        uart_tx_smoke_sequence seq;
 
         phase.raise_objection(this);
 
-        seq = uart_rx_smoke_sequence::type_id::create("seq");
+        seq = uart_tx_smoke_sequence::type_id::create("seq");
 
         seq.start(env.apb_agt.sequencer);
 

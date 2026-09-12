@@ -6,7 +6,8 @@ class uart_agent extends uvm_agent;
     `uvm_component_utils(uart_agent)
 
     uart_driver    driver;
-    uart_monitor   monitor;
+    uart_tx_monitor   tx_monitor;
+    uart_rx_monitor   rx_monitor;
     uart_sequencer sequencer;
 
     function new(
@@ -24,8 +25,12 @@ class uart_agent extends uvm_agent;
             "driver", this
         );
 
-        monitor = uart_monitor::type_id::create(
-            "monitor", this
+        tx_monitor = uart_tx_monitor::type_id::create(
+            "tx_monitor", this
+        );
+
+        rx_monitor = uart_rx_monitor::type_id::create(
+            "rx_monitor", this
         );
 
         sequencer = uart_sequencer::type_id::create(

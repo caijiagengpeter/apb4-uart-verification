@@ -41,7 +41,8 @@ INC_DIRS = \
 	+incdir+tb/uart_agent \
 	+incdir+tb/sequences \
 	+incdir+tb/env \
-	+incdir+tb/tests
+	+incdir+tb/tests\
+	+incdir+tb/scoreboard
 
 
 # ============================================================

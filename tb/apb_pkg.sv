@@ -16,7 +16,8 @@ package apb_pkg;
     `include "uart_sequence.sv"
     `include "uart_sequencer.sv"
     `include "uart_driver.sv"
-    `include "uart_monitor.sv"
+    `include "uart_rx_monitor.sv"
+    `include "uart_tx_monitor.sv"
     `include "uart_agent.sv"
 
     // Sequences
@@ -25,10 +26,20 @@ package apb_pkg;
     `include "uart_rx_smoke_sequence.sv"
     `include "uart_send_sequence.sv"
     `include "apb_read_sequence.sv"
+    `include "uart_tx_multi_sequence.sv"
+    `include "uart_rx_multi_sequence.sv"
 
-    // Env / tests
+    // Scoreboard
+    `include "tb_scoreboard.sv"
+
+    // Env
     `include "tb_env.sv"
+
+    // Tests
+    `include "tb_base_test.sv"
     `include "apb_test.sv"
-    `include "uart_test.sv"
+    `include "uart_tx_test.sv"
+    `include "uart_rx_test.sv"
+
 
 endpackage
