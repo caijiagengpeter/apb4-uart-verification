@@ -32,11 +32,11 @@ class tb_scoreboard extends uvm_scoreboard;
         if (tr.write &&
             (tr.addr == 8'h08) &&
             tr.strb[0]) begin
-
-            expected_tx_queue.push_back(tr.wdata[7:0]);
-
+            if(expected_tx_queue.size() < 16)begin
+                expected_tx_queue.push_back(tr.wdata[7:0]);
+            end
         end
-
+//////////////////////////////////////////////////////////////////////////////
         // RX: APB read RXDATA → actual RX
         else if (!tr.write &&
                  (tr.addr == 8'h0C)) begin

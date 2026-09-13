@@ -23,8 +23,10 @@ package apb_pkg;
     // Sequences
     `include "apb_smoke_sequence.sv"
     `include "uart_tx_smoke_sequence.sv"
-    //`include "uart_rx_smoke_sequence.sv"
+    `include "apb_enable.sv"
+    `include "apb_read_stat.sv"
     `include "apb_rx_enable.sv"
+    `include "apb_tx_enable.sv"
     `include "uart_send_sequence.sv"
     `include "apb_read_sequence.sv"
     `include "uart_tx_multi_sequence.sv"
@@ -41,6 +43,10 @@ package apb_pkg;
     `include "apb_test.sv"
     `include "uart_tx_test.sv"
     `include "uart_rx_test.sv"
+    `include "uart_rx_gap0_test.sv"
+    `include "uart_rx_gap1_test.sv"
+    `include "uart_tx_fifo_boundary_test.sv"
+    
 
 
 endpackage

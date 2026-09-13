@@ -9,7 +9,7 @@ class uart_tx_multi_sequence extends apb_sequence;
     rand logic [7:0] tx_data[];
 
     constraint c_num_bytes {
-        num_bytes inside {[1:8]};
+        num_bytes inside {[1:20]};
     }
 
     constraint c_data_size {
@@ -28,13 +28,6 @@ class uart_tx_multi_sequence extends apb_sequence;
             "Starting randomized UART TX multi sequence",
             UVM_MEDIUM
         )
-
-        // Enable UART + TX
-        apb_write(
-            8'h00,
-            32'h0000_0003,
-            4'b0001
-        );
 
         foreach (tx_data[i]) begin
 
