@@ -11,11 +11,16 @@ localparam int HALF_CLKS_PER_BIT = CLKS_PER_BIT / 2;     // 217
     virtual uart_if.MONITOR vif;
 
     uvm_analysis_port #(uart_item) uap;
+    uvm_analysis_port #(uart_item) uap_start;
 
-    function new(string name = "uart_tx_monitor",
-                 uvm_component parent = null);
+    function new(
+        string name = "uart_tx_monitor",
+        uvm_component parent = null
+    );
         super.new(name, parent);
-        uap = new("uap", this);
+
+        uap       = new("uap", this);
+        uap_start = new("uap_start", this);
     endfunction
 
     function void build_phase(uvm_phase phase);
@@ -26,29 +31,46 @@ localparam int HALF_CLKS_PER_BIT = CLKS_PER_BIT / 2;     // 217
     endfunction
 
     virtual task run_phase(uvm_phase phase);
-
+    
         uart_item req;
-
+    
         forever begin
-
+        
             wait(vif.rst_n === 1'b1);
-
+    
             req = uart_item::type_id::create("req");
-
+    
+            // ------------------------------------------------
+            // 1. Detect confirmed frame start
+            // ------------------------------------------------
             wait_start_bit();
+    
+            // Notify scoreboard:
+            // DUT TX FIFO has effectively started consuming one byte
+            uap_start.write(req);
+    
+            // ------------------------------------------------
+            // 2. Decode actual UART frame
+            // ------------------------------------------------
             sample_data_bits(req);
             sample_stop_bit();
-
+    
             `uvm_info(
                 "UART_TX_MONITOR",
-                $sformatf("Monitoring UART with data: 0x%02h", req.data),
+                $sformatf(
+                    "Monitoring UART with data: 0x%02h",
+                    req.data
+                ),
                 UVM_MEDIUM
             )
-
+    
+            // ------------------------------------------------
+            // 3. Complete frame -> data comparison
+            // ------------------------------------------------
             uap.write(req);
-
+    
         end
-
+    
     endtask
 ///////////////////////////////////////////////////////////////////////////////////////////
     task wait_start_bit();

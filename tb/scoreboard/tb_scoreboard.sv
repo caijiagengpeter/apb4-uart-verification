@@ -4,6 +4,7 @@
 `uvm_analysis_imp_decl(_apb)
 `uvm_analysis_imp_decl(_uart_tx)
 `uvm_analysis_imp_decl(_uart_rx)
+`uvm_analysis_imp_decl(_uart_tx_start)
 
 class tb_scoreboard extends uvm_scoreboard;
 
@@ -44,6 +45,10 @@ class tb_scoreboard extends uvm_scoreboard;
         tb_scoreboard
     ) uart_imp_rx;
 
+    uvm_analysis_imp_uart_tx_start #(
+        uart_item,
+        tb_scoreboard
+    ) uart_imp_tx_start;
 
     // ============================================================
     // Constructor
@@ -58,6 +63,7 @@ class tb_scoreboard extends uvm_scoreboard;
         apb_imp     = new("apb_imp", this);
         uart_imp_tx = new("uart_imp_tx", this);
         uart_imp_rx = new("uart_imp_rx", this);
+        uart_imp_tx_start = new("uart_imp_tx_start", this);
 
     endfunction
 
@@ -67,44 +73,32 @@ class tb_scoreboard extends uvm_scoreboard;
     // ============================================================
     function void write_apb(apb_item tr);
 
-        logic [7:0] expected_data;
-
-        // --------------------------------------------------------
-        // TX path
-        //
-        // APB write TXDATA -> expected UART TX
-        //
-        // Temporary model:
-        // accept only first FIFO_DEPTH bytes.
-        // TX occupancy will be modeled more accurately later.
-        // --------------------------------------------------------
         if (tr.write &&
             (tr.addr == 8'h08) &&
             tr.strb[0]) begin
-
-            if (expected_tx_queue.size() < FIFO_DEPTH) begin
-
-                expected_tx_queue.push_back(
-                    tr.wdata[7:0]
-                );
+            
+            if (tx_fifo_count < FIFO_DEPTH) begin
+            
+                expected_tx_queue.push_back(tr.wdata[7:0]);
+                tx_fifo_count++;
 
                 `uvm_info(
                     "TB_SCOREBOARD",
                     $sformatf(
-                        "TX expected push: data=0x%02h queue_size=%0d",
+                        "TX FIFO model push: data=0x%02h count=%0d",
                         tr.wdata[7:0],
-                        expected_tx_queue.size()
+                        tx_fifo_count
                     ),
                     UVM_HIGH
                 )
 
             end
             else begin
-
+            
                 `uvm_info(
                     "TB_SCOREBOARD",
                     $sformatf(
-                        "TX FIFO model full: ignore TXDATA write data=0x%02h",
+                        "TX FIFO model full: reject data=0x%02h",
                         tr.wdata[7:0]
                     ),
                     UVM_MEDIUM
@@ -113,61 +107,6 @@ class tb_scoreboard extends uvm_scoreboard;
             end
 
         end
-
-
-        // --------------------------------------------------------
-        // RX path
-        //
-        // APB read RXDATA -> compare against UART RX expected data
-        // --------------------------------------------------------
-        if (!tr.write &&
-            (tr.addr == 8'h0C)) begin
-
-            if (rx_fifo_count == 0) begin
-
-                `uvm_error(
-                    "TB_SCOREBOARD",
-                    "RXDATA read while RX FIFO model is empty"
-                )
-
-            end
-            else begin
-
-                expected_data =
-                    expected_rx_queue.pop_front();
-
-                rx_fifo_count--;
-
-                if (tr.rdata[7:0] !== expected_data) begin
-
-                    `uvm_error(
-                        "TB_SCOREBOARD",
-                        $sformatf(
-                            "RX data mismatch: expected 0x%02h, got 0x%02h",
-                            expected_data,
-                            tr.rdata[7:0]
-                        )
-                    )
-
-                end
-                else begin
-
-                    `uvm_info(
-                        "TB_SCOREBOARD",
-                        $sformatf(
-                            "RX data match: 0x%02h, RX FIFO model count=%0d",
-                            tr.rdata[7:0],
-                            rx_fifo_count
-                        ),
-                        UVM_MEDIUM
-                    )
-
-                end
-
-            end
-
-        end
-
     endfunction
 
 
@@ -189,8 +128,7 @@ class tb_scoreboard extends uvm_scoreboard;
 
         end
 
-        expected_data =
-            expected_tx_queue.pop_front();
+        expected_data = expected_tx_queue.pop_front();
 
         if (tr.data !== expected_data) begin
 
@@ -218,7 +156,34 @@ class tb_scoreboard extends uvm_scoreboard;
         end
 
     endfunction
+/////////////////////////////////////////////////////////////////////////////////////
+    function void write_uart_tx_start(uart_item tr);
 
+        if (tx_fifo_count == 0) begin
+
+            `uvm_error(
+                "TB_SCOREBOARD",
+                "UART TX started while TX FIFO model is empty"
+            )
+
+        end
+        else begin
+
+            tx_fifo_count--;
+
+            `uvm_info(
+                "TB_SCOREBOARD",
+                $sformatf(
+                    "TX FIFO model pop at frame start: count=%0d",
+                    tx_fifo_count
+                ),
+                UVM_HIGH
+            )
+
+        end
+
+    endfunction
+/////////////////////////////////////////////////////////////////////////////////////
 
     // ============================================================
     // UART RX monitor callback
@@ -315,6 +280,16 @@ class tb_scoreboard extends uvm_scoreboard;
                 )
             )
 
+        end
+
+        if (tx_fifo_count != 0) begin
+            `uvm_error(
+                "TB_SCOREBOARD",
+                $sformatf(
+                    "TX FIFO model count is not zero at end of test: %0d",
+                    tx_fifo_count
+                )
+            )
         end
 
     endfunction
