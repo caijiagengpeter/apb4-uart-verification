@@ -5,25 +5,14 @@ class uart_rx_test extends tb_base_test;
 
     `uvm_component_utils(uart_rx_test)
 
+    int unsigned rx_num_bytes = 0;
+
     function new(
         string name = "uart_rx_test",
         uvm_component parent = null
     );
 
         super.new(name, parent);
-
-    endfunction
-
-    function void build_phase(uvm_phase phase);
-
-        uvm_config_db#(int unsigned)::set(
-            this,
-            "env.uart_agt.driver",
-            "inter_frame_gap_bits",
-            0///////////////////////////////////////////////////////// here to change the inter_frame_gap_bits, default is 1, if you want to test the corner case, you can set it to 0 or more
-        );
-
-        super.build_phase(phase);
 
     endfunction
 
@@ -38,12 +27,39 @@ class uart_rx_test extends tb_base_test;
         apb_rx_seq = apb_rx_enable::type_id::create("apb_rx_seq");
         rx_seq     = uart_rx_multi_sequence::type_id::create("rx_seq");
 
-        assert(rx_seq.randomize() with {num_bytes == 4;})
-        else
-            `uvm_fatal(
-                "UART_RX_TEST",
-                "Sequence randomization failed"
+
+//////////////////////////////////////////////////////////////////////////////
+        if (rx_num_bytes == 0) begin
+
+            assert(
+                rx_seq.randomize() with {
+                    num_bytes inside {[1:8]};
+                }
             )
+            else begin
+                `uvm_fatal(
+                    "UART_RX_TEST",
+                    "Randomization failed"
+                )
+            end
+
+        end
+        else begin
+
+            assert(
+                rx_seq.randomize() with {
+                    num_bytes == local::rx_num_bytes;
+                }
+            )
+            else begin
+                `uvm_fatal(
+                    "UART_RX_TEST",
+                    "Randomization failed"
+                )
+            end
+
+        end
+///////////////////////////////////////////////////////////////////////////////
 
         // 1. Enable UART RX
         apb_rx_seq.start(env.apb_agt.sequencer);

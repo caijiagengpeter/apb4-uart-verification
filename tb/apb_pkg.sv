@@ -46,6 +46,7 @@ package apb_pkg;
     `include "uart_rx_gap0_test.sv"
     `include "uart_rx_gap1_test.sv"
     `include "uart_tx_fifo_boundary_test.sv"
+    `include "uart_rx_fifo_boundary_test.sv"
     
 
 

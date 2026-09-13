@@ -7,7 +7,7 @@ class uart_driver extends uvm_driver #(uart_item);
 
     virtual uart_if.DRIVER vif;
 ///////////////////////////////////////////////conner case
-    int unsigned inter_frame_gap_bits = 0;
+    int unsigned inter_frame_gap_bits = 1;
 ///////////////////////////////////////////////
     localparam int CLKS_PER_BIT = 50_000_000 / 115_200;
 
@@ -34,7 +34,7 @@ class uart_driver extends uvm_driver #(uart_item);
                 inter_frame_gap_bits
             )) begin
 
-            inter_frame_gap_bits = 0;
+            inter_frame_gap_bits = 1;
 
         end
 

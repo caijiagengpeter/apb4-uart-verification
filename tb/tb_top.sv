@@ -150,7 +150,7 @@ module tb_top;
             uart_vif
         );
 
-        run_test("uart_rx_test");
+        run_test("uart_rx_fifo_boundary_test");
 
     end
 

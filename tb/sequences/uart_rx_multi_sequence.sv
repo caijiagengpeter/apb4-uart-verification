@@ -9,7 +9,7 @@ class uart_rx_multi_sequence extends uart_sequence;
     rand logic [7:0] rx_data[];
 
     constraint c_num_bytes {
-        num_bytes inside {[1:8]};
+        num_bytes inside {[1:20]};
     }
 
     constraint c_data_size {
