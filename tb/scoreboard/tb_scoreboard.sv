@@ -5,6 +5,7 @@
 `uvm_analysis_imp_decl(_uart_tx)
 `uvm_analysis_imp_decl(_uart_rx)
 `uvm_analysis_imp_decl(_uart_tx_start)
+`uvm_analysis_imp_decl(_uart_rx_start)
 
 class tb_scoreboard extends uvm_scoreboard;
 
@@ -15,6 +16,8 @@ class tb_scoreboard extends uvm_scoreboard;
     // ============================================================
     logic [7:0] expected_tx_queue[$];
     logic [7:0] expected_rx_queue[$];
+    logic       expected_tx_full;
+    logic       expected_rx_empty;
 
     // ============================================================
     // FIFO reference model
@@ -26,6 +29,15 @@ class tb_scoreboard extends uvm_scoreboard;
 
     // RX occupancy model
     int unsigned rx_fifo_count = 0;
+
+    // STAT model
+    int unsigned stat_check_count = 0;
+
+    // STAT bit[0] for TX
+    logic expected_tx_busy = 1'b0;
+
+    // STAT bit[1] for RX
+    logic expected_rx_busy = 1'b0;
 
     // ============================================================
     // Analysis implementations
@@ -50,6 +62,12 @@ class tb_scoreboard extends uvm_scoreboard;
         tb_scoreboard
     ) uart_imp_tx_start;
 
+    uvm_analysis_imp_uart_rx_start #(
+        uart_item,
+        tb_scoreboard
+    ) uart_imp_rx_start;
+
+
     // ============================================================
     // Constructor
     // ============================================================
@@ -64,6 +82,7 @@ class tb_scoreboard extends uvm_scoreboard;
         uart_imp_tx = new("uart_imp_tx", this);
         uart_imp_rx = new("uart_imp_rx", this);
         uart_imp_tx_start = new("uart_imp_tx_start", this);
+        uart_imp_rx_start = new("uart_imp_rx_start", this);
 
     endfunction
 
@@ -73,12 +92,17 @@ class tb_scoreboard extends uvm_scoreboard;
     // ============================================================
     function void write_apb(apb_item tr);
 
+    logic [7:0] expected_data;
+
+    // ========================================================
+    // TX: APB write TXDATA
+    // ========================================================
         if (tr.write &&
             (tr.addr == 8'h08) &&
             tr.strb[0]) begin
-            
+
             if (tx_fifo_count < FIFO_DEPTH) begin
-            
+
                 expected_tx_queue.push_back(tr.wdata[7:0]);
                 tx_fifo_count++;
 
@@ -94,7 +118,7 @@ class tb_scoreboard extends uvm_scoreboard;
 
             end
             else begin
-            
+
                 `uvm_info(
                     "TB_SCOREBOARD",
                     $sformatf(
@@ -107,6 +131,117 @@ class tb_scoreboard extends uvm_scoreboard;
             end
 
         end
+
+
+    // ========================================================
+    // RX: APB read RXDATA
+    // ========================================================
+        if (!tr.write &&
+            (tr.addr == 8'h0C)) begin
+
+            if (rx_fifo_count == 0) begin
+
+                `uvm_error(
+                    "TB_SCOREBOARD",
+                    "RXDATA read while RX FIFO model is empty"
+                )
+
+            end
+            else begin
+
+                expected_data = expected_rx_queue.pop_front();
+
+                rx_fifo_count--;
+
+                if (tr.rdata[7:0] !== expected_data) begin
+
+                    `uvm_error(
+                        "TB_SCOREBOARD",
+                        $sformatf(
+                            "RX data mismatch: expected 0x%02h, got 0x%02h",
+                            expected_data,
+                            tr.rdata[7:0]
+                        )
+                    )
+
+                end
+                else begin
+
+                    `uvm_info(
+                        "TB_SCOREBOARD",
+                        $sformatf(
+                            "RX data match: 0x%02h, RX FIFO count=%0d",
+                            tr.rdata[7:0],
+                            rx_fifo_count
+                        ),
+                        UVM_MEDIUM
+                    )
+
+                end
+
+            end
+
+        end
+
+    // ========================================================
+    // APB Check the expected_tx_full and expected_rx_empty
+    // ========================================================
+    if (!tr.write && tr.addr == 8'h04) begin
+
+        stat_check_count++;// count check
+
+        expected_tx_full  = (tx_fifo_count == FIFO_DEPTH);
+        expected_rx_empty = (rx_fifo_count == 0);
+
+        if (tr.rdata[2] !== expected_tx_full) begin
+            `uvm_error(
+                "TB_SCOREBOARD",
+                $sformatf(
+                    "TX_FULL mismatch: expected=%0b actual=%0b tx_count=%0d",
+                    expected_tx_full,
+                    tr.rdata[2],
+                    tx_fifo_count
+                )
+            )
+        end
+
+        if (tr.rdata[3] !== expected_rx_empty) begin
+            `uvm_error(
+                "TB_SCOREBOARD",
+                $sformatf(
+                    "RX_EMPTY mismatch: expected=%0b actual=%0b rx_count=%0d",
+                    expected_rx_empty,
+                    tr.rdata[3],
+                    rx_fifo_count
+                )
+            )
+        end
+
+
+
+      if (tr.rdata[0] !== expected_tx_busy) begin
+            `uvm_error(
+                "TB_SCOREBOARD",
+                $sformatf(
+                    "TX_BUSY mismatch: expected=%0b actual=%0b",
+                    expected_tx_busy,
+                    tr.rdata[0]
+                )
+            )
+        end
+
+        if (tr.rdata[1] !== expected_rx_busy) begin
+            `uvm_error(
+                "TB_SCOREBOARD",
+                $sformatf(
+                    "RX_BUSY mismatch: expected=%0b actual=%0b",
+                    expected_rx_busy,
+                    tr.rdata[1]
+                )
+            )
+        end
+
+    end
     endfunction
 
 
@@ -154,10 +289,16 @@ class tb_scoreboard extends uvm_scoreboard;
             )
 
         end
+        expected_tx_busy = 1'b0;
 
     endfunction
 /////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////
+
+
     function void write_uart_tx_start(uart_item tr);
+        expected_tx_busy = 1'b1;
 
         if (tx_fifo_count == 0) begin
 
@@ -183,7 +324,6 @@ class tb_scoreboard extends uvm_scoreboard;
         end
 
     endfunction
-/////////////////////////////////////////////////////////////////////////////////////
 
     // ============================================================
     // UART RX monitor callback
@@ -224,10 +364,18 @@ class tb_scoreboard extends uvm_scoreboard;
             )
 
         end
+        expected_rx_busy = 1'b0;
+    endfunction
 
+//////////////////////////////////////////////////////////////////function receive the start, means the rx_busy = 1'b1;
+    function void write_uart_rx_start(uart_item tr);
+        expected_rx_busy = 1'b1;
     endfunction
 
 
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // ============================================================
     // End-of-test checks
     // ============================================================
@@ -289,6 +437,13 @@ class tb_scoreboard extends uvm_scoreboard;
                     "TX FIFO model count is not zero at end of test: %0d",
                     tx_fifo_count
                 )
+            )
+        end
+
+        if (stat_check_count == 0) begin
+            `uvm_error(
+                "TB_SCOREBOARD",
+                "No STAT register check was performed"
             )
         end
 

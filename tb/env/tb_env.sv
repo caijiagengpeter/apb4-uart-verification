@@ -32,6 +32,8 @@ class tb_env extends uvm_env;
         uart_agt.tx_monitor.uap.connect(scoreboard.uart_imp_tx);
         uart_agt.rx_monitor.uaprx.connect(scoreboard.uart_imp_rx);
         uart_agt.tx_monitor.uap_start.connect(scoreboard.uart_imp_tx_start);
+        uart_agt.rx_monitor.uap_rx_start.connect(scoreboard.uart_imp_rx_start);
+
     endfunction
 
 endclass

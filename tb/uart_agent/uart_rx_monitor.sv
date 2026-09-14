@@ -11,11 +11,13 @@ localparam int HALF_CLKS_PER_BIT = CLKS_PER_BIT / 2;     // 217
     virtual uart_if.MONITOR vif;
 
     uvm_analysis_port #(uart_item) uaprx;
+    uvm_analysis_port #(uart_item) uap_rx_start;
 
     function new(string name = "uart_rx_monitor",
                  uvm_component parent = null);
         super.new(name, parent);
         uaprx = new("uaprx", this);
+        uap_rx_start = new("uap_rx_start", this);
     endfunction
 
     function void build_phase(uvm_phase phase);
@@ -36,6 +38,9 @@ localparam int HALF_CLKS_PER_BIT = CLKS_PER_BIT / 2;     // 217
             req = uart_item::type_id::create("req");
 
             wait_start_bit();
+
+            uap_rx_start.write(req);
+
             sample_data_bits(req);
             sample_stop_bit();
 
