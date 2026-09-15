@@ -121,27 +121,14 @@ class uart_rx_fifo_boundary_test extends tb_base_test;
         // Verified in waveform:
         // RX FIFO full + 17th frame completion -> overrun pulse observed.
         //
-        // TODO:
+        // HAVE DONE:
         // Verify this condition with SVA / internal monitor instead of APB polling.
-
-        /*
-        seq_stat.start(env.apb_agt.sequencer);
-
-        if (seq_stat.rdata[6] !== 1'b1)
-            `uvm_error(
-                "UART_RX_FIFO_BOUNDARY_TEST",
-                "Overrun Error expected 1"
-            )
-        */
 
         // ------------------------------------------------
         // 8. Enable the Rx Transmission
         //
         // ------------------------------------------------
         rx_en.start(env.apb_agt.sequencer);
-
-        #500us;
-
 
 
         // ------------------------------------------------

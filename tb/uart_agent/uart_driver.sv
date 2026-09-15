@@ -78,14 +78,27 @@ class uart_driver extends uvm_driver #(uart_item);
         end
 
         // stop
-        vif.rx <= 1'b1;
-        wait_bit_time();
 
-        `uvm_info(
-            "UART_DRIVER",
-            $sformatf("Driving UART with data: 0x%02h", req.data),
-            UVM_MEDIUM
-        )
+        vif.rx <= !req.inject_frame_error;
+        wait_bit_time();
+        
+        // return UART line to idle
+        vif.rx <= 1'b1;
+        
+        // extra idle gap, only between frames
+        repeat (CLKS_PER_BIT * inter_frame_gap_bits)
+        @(posedge vif.clk);
+            `uvm_info(
+                "UART_DRIVER",
+                $sformatf(
+                    "Driving UART data=0x%02h frame_error=%0b",
+                    req.data,
+                    req.inject_frame_error
+                ),
+                UVM_MEDIUM
+            )
+
+
 
         // extra idle gap, only between frames
         repeat (CLKS_PER_BIT * inter_frame_gap_bits)

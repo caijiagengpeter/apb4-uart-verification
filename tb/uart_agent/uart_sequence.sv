@@ -9,18 +9,29 @@ class uart_sequence extends uvm_sequence #(uart_item);
         super.new(name);
     endfunction
 
-    task send_uart(input logic [7:0] data);
-
+    task send_uart(
+        input logic [7:0] data,
+        input bit inject_frame_error = 1'b0
+    );
+    
         uart_item req;
-
+    
         req = uart_item::type_id::create("req");
-
+    
         start_item(req);
-
-        req.data = data;
-
+    
+        assert(req.randomize() with {
+            data               == local::data;
+            inject_frame_error == local::inject_frame_error;
+        })
+        else
+            `uvm_fatal(
+                "UART_SEQUENCE",
+                "uart_item randomization failed"
+            )
+    
         finish_item(req);
-
+    
     endtask
 
     task body();

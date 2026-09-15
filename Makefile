@@ -41,8 +41,9 @@ INC_DIRS = \
 	+incdir+tb/uart_agent \
 	+incdir+tb/sequences \
 	+incdir+tb/env \
-	+incdir+tb/tests\
-	+incdir+tb/scoreboard
+	+incdir+tb/tests \
+	+incdir+tb/scoreboard \
+	+incdir+tb/assertions
 
 
 # ============================================================
@@ -68,6 +69,14 @@ VCS_FLAGS = \
 	-kdb \
 	$(VERDI_PLI)
 
+# ============================================================
+# Assertions
+# ============================================================
+
+ASSERT = \
+	tb/assertions/uart_assertions.sv \
+	tb/assertions/uart_bind.sv
+
 
 # ============================================================
 # Targets  +ntb_random_seed_automatic
@@ -78,14 +87,14 @@ all: compile
 
 compile:
 	$(VCS) $(VCS_FLAGS) \
-		$(RTL) \
-		$(TB) \
+	$(RTL) \
+	$(ASSERT) \
+	$(TB) \
 		-top $(TOP) \
 		-o simv
 
-
 run: compile
-	./simv
+	./simv | tee simv.log
 
 
 verdi:

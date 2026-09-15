@@ -7,6 +7,11 @@ class uart_rx_multi_sequence extends uart_sequence;
 
     rand int unsigned num_bytes;
     rand logic [7:0] rx_data[];
+    rand bit inject_frame_error;
+
+    constraint c_default_frame_error {
+        soft inject_frame_error == 1'b0;
+    }
 
     constraint c_num_bytes {
         num_bytes inside {[1:20]};
@@ -33,13 +38,22 @@ class uart_rx_multi_sequence extends uart_sequence;
 
             `uvm_info(
                 "UART_RX_MULTI_SEQ",
-                $sformatf("RX[%0d] = 0x%02h", i, rx_data[i]),
+                $sformatf(
+                    "RX[%0d] = 0x%02h frame_error=%0b",
+                    i,
+                    rx_data[i],
+                    inject_frame_error
+                ),
                 UVM_MEDIUM
             )
 
-            send_uart(rx_data[i]);
-        end
+            send_uart(
+                rx_data[i],
+                inject_frame_error
+            );
 
+        end
+        
     endtask
 
 endclass

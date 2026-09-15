@@ -30,6 +30,7 @@ localparam int HALF_CLKS_PER_BIT = CLKS_PER_BIT / 2;     // 217
     virtual task run_phase(uvm_phase phase);
 
         uart_item req;
+        bit frame_valid;
 
         forever begin
 
@@ -42,20 +43,25 @@ localparam int HALF_CLKS_PER_BIT = CLKS_PER_BIT / 2;     // 217
             uap_rx_start.write(req);
 
             sample_data_bits(req);
-            sample_stop_bit();
 
-            `uvm_info(
-                "UART_RX_MONITOR",
-                $sformatf("Monitoring UART with data: 0x%02h", req.data),
-                UVM_MEDIUM
-            )
+            sample_stop_bit(req, frame_valid);
 
-            uaprx.write(req);
+            if (frame_valid) begin
+                `uvm_info(
+                    "UART_RX_MONITOR",
+                    $sformatf(
+                        "Monitoring valid UART frame with data: 0x%02h",
+                        req.data
+                    ),
+                    UVM_MEDIUM
+                )
+            end
 
         end
 
     endtask
-///////////////////////////////////////////////////////////////////////////////////////////
+    
+
     task wait_start_bit();
 
         forever begin
@@ -95,19 +101,34 @@ localparam int HALF_CLKS_PER_BIT = CLKS_PER_BIT / 2;     // 217
     endtask
 
 
-    task sample_stop_bit();
+    task sample_stop_bit(
+        uart_item req,
+        output bit frame_valid
+    );
 
         repeat (CLKS_PER_BIT)
             @(posedge vif.clk);
 
         if (vif.rx !== 1'b1) begin
-            `uvm_error(
+
+            frame_valid = 1'b0;
+
+            `uvm_info(
                 "UART_RX_MONITOR",
-                "Invalid stop bit"
+                "Invalid stop bit observed, dropping frame",
+                UVM_MEDIUM
             )
+
+        end
+        else begin
+
+            frame_valid = 1'b1;
+            uaprx.write(req);
+
         end
 
     endtask
+    
 endclass
 
 `endif

@@ -150,7 +150,7 @@ module tb_top;
             uart_vif
         );
 
-        run_test("stat_rx_busy_bit_test");
+        run_test("stat_frame_error_test");
 
     end
 
