@@ -5,6 +5,30 @@ module tb_top;
 
     `include "uvm_macros.svh"
 
+
+    // ============================================================
+    // DUT compile-time UART configuration
+    // ============================================================
+
+`ifdef UART_PARITY_EVEN
+
+    localparam bit    DUT_PARITY_ENABLE = 1'b1;
+    localparam string DUT_PARITY_TYPE   = "even";
+
+`elsif UART_PARITY_ODD
+
+    localparam bit    DUT_PARITY_ENABLE = 1'b1;
+    localparam string DUT_PARITY_TYPE   = "odd";
+
+`else
+
+    // Default configuration: 8N1
+    localparam bit    DUT_PARITY_ENABLE = 1'b0;
+    localparam string DUT_PARITY_TYPE   = "even";
+
+`endif
+
+
     // ============================================================
     // Clock
     // ============================================================
@@ -35,8 +59,10 @@ module tb_top;
     // ============================================================
 
     initial begin
+
         $fsdbDumpfile("wave.fsdb");
         $fsdbDumpvars(0, tb_top);
+
     end
 
 
@@ -76,7 +102,12 @@ module tb_top;
     // DUT
     // ============================================================
 
-    uart_controller dut (
+    uart_controller #(
+
+        .PARITY_ENABLE (DUT_PARITY_ENABLE),
+        .PARITY_TYPE   (DUT_PARITY_TYPE)
+
+    ) dut (
 
         .pclk_i          (pclk),
         .presetn_i       (apb_vif.PRESETn),
@@ -102,6 +133,21 @@ module tb_top;
         .irq_rx_full_o   (irq_rx_full)
 
     );
+
+
+    // ============================================================
+    // Optional configuration display
+    // ============================================================
+
+    initial begin
+
+        $display(
+            "[TB_CONFIG] DUT parity enable=%0b type=%s",
+            DUT_PARITY_ENABLE,
+            DUT_PARITY_TYPE
+        );
+
+    end
 
 
     // ============================================================
@@ -150,7 +196,8 @@ module tb_top;
             uart_vif
         );
 
-        run_test("stat_frame_error_test");
+        // Test selected by +UVM_TESTNAME
+        run_test();
 
     end
 

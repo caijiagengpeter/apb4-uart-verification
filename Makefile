@@ -85,16 +85,34 @@ ASSERT = \
 all: compile
 
 
+EXTRA_FLAGS ?=
+
 compile:
-	$(VCS) $(VCS_FLAGS) \
-	$(RTL) \
-	$(ASSERT) \
-	$(TB) \
-		-top $(TOP) \
+	$(VCS) $(VCS_FLAGS) $(EXTRA_FLAGS) \
+		$(RTL) \
+		$(ASSERT) \
+		$(TB) \
 		-o simv
 
-run: compile
+
+compile_parity_even:
+	$(MAKE) compile EXTRA_FLAGS="+define+UART_PARITY_EVEN"
+
+
+compile_parity_odd:
+	$(MAKE) compile EXTRA_FLAGS="+define+UART_PARITY_ODD"
+
+
+run:
 	./simv | tee simv.log
+
+
+run_test:
+	./simv +UVM_TESTNAME=$(TEST) | tee simv.log
+
+
+run_parity_error:
+	./simv +UVM_TESTNAME=stat_parity_error_test | tee simv.log
 
 
 verdi:
@@ -112,4 +130,22 @@ clean:
 		ucli.key \
 		vc_hdrs.h \
 		AN.DB \
-		verdiLog
+		verdiLog \
+		simv.log \
+		wave.fsdb
+
+# ==================================================================
+frame_error:
+	$(MAKE) clean
+	$(MAKE) compile
+	./simv +UVM_TESTNAME=stat_frame_error_test | tee simv.log
+
+parity_even_error:
+	$(MAKE) clean
+	$(MAKE) compile_parity_even
+	./simv +UVM_TESTNAME=stat_rx_parity_bit_test | tee simv.log
+
+parity_odd_error:
+	$(MAKE) clean
+	$(MAKE) compile_parity_odd
+	./simv +UVM_TESTNAME=stat_rx_parity_odd_bit_test | tee simv.log

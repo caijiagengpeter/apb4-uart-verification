@@ -3,8 +3,8 @@
 
 class uart_rx_monitor extends uvm_monitor;
 
-localparam int CLKS_PER_BIT      = 50_000_000 / 115_200; // 434
-localparam int HALF_CLKS_PER_BIT = CLKS_PER_BIT / 2;     // 217
+    localparam int CLKS_PER_BIT       = 50_000_000 / 115_200; // 434
+    localparam int HALF_CLKS_PER_BIT  = CLKS_PER_BIT / 2;     // 217
 
     `uvm_component_utils(uart_rx_monitor)
 
@@ -13,19 +13,53 @@ localparam int HALF_CLKS_PER_BIT = CLKS_PER_BIT / 2;     // 217
     uvm_analysis_port #(uart_item) uaprx;
     uvm_analysis_port #(uart_item) uap_rx_start;
 
-    function new(string name = "uart_rx_monitor",
-                 uvm_component parent = null);
+    // Monitor configuration
+    bit parity_en = 1'b0;
+
+    function new(
+        string name = "uart_rx_monitor",
+        uvm_component parent = null
+    );
         super.new(name, parent);
+
         uaprx = new("uaprx", this);
         uap_rx_start = new("uap_rx_start", this);
     endfunction
 
+
     function void build_phase(uvm_phase phase);
+
         super.build_phase(phase);
-        if(!uvm_config_db#(virtual uart_if.MONITOR)::get(this, "", "vif", vif)) begin
-            `uvm_fatal("UART_RX_MONITOR", "Failed to get virtual interface")
+
+        if (!uvm_config_db#(virtual uart_if.MONITOR)::get(
+                this,
+                "",
+                "vif",
+                vif
+            )) begin
+
+            `uvm_fatal(
+                "UART_RX_MONITOR",
+                "Failed to get virtual interface"
+            )
+
         end
+
+        // Default remains parity disabled.
+        // Parity-enabled tests can override this through config_db.
+        if (!uvm_config_db#(bit)::get(
+                this,
+                "",
+                "parity_en",
+                parity_en
+            )) begin
+
+            parity_en = 1'b0;
+
+        end
+
     endfunction
+
 
     virtual task run_phase(uvm_phase phase);
 
@@ -40,27 +74,40 @@ localparam int HALF_CLKS_PER_BIT = CLKS_PER_BIT / 2;     // 217
 
             wait_start_bit();
 
+            // RX transaction has started
             uap_rx_start.write(req);
 
+            // Sample 8 data bits
             sample_data_bits(req);
 
+            // If parity mode is enabled, consume one parity bit
+            // before checking the stop bit.
+            if (parity_en) begin
+                sample_parity_bit(req);
+            end
+
+            // Sample and validate stop bit
             sample_stop_bit(req, frame_valid);
 
             if (frame_valid) begin
+
                 `uvm_info(
                     "UART_RX_MONITOR",
                     $sformatf(
-                        "Monitoring valid UART frame with data: 0x%02h",
-                        req.data
+                        "Monitoring valid UART frame: data=0x%02h parity_en=%0b parity_bit=%0b",
+                        req.data,
+                        parity_en,
+                        req.parity_bit
                     ),
                     UVM_MEDIUM
                 )
+
             end
 
         end
 
     endtask
-    
+
 
     task wait_start_bit();
 
@@ -72,7 +119,7 @@ localparam int HALF_CLKS_PER_BIT = CLKS_PER_BIT / 2;     // 217
                 @(posedge vif.clk);
 
             if (vif.rx === 1'b0) begin
-                return;  // 确认真 start，退出 task
+                return;
             end
 
             `uvm_warning(
@@ -80,8 +127,6 @@ localparam int HALF_CLKS_PER_BIT = CLKS_PER_BIT / 2;     // 217
                 "False start bit detected"
             )
 
-            // 不 return
-            // forever 自动回去继续等下一个 negedge
         end
 
     endtask
@@ -97,6 +142,25 @@ localparam int HALF_CLKS_PER_BIT = CLKS_PER_BIT / 2;     // 217
             req.data[i] = vif.rx;
 
         end
+
+    endtask
+
+
+    task sample_parity_bit(uart_item req);
+
+        repeat (CLKS_PER_BIT)
+            @(posedge vif.clk);
+
+        req.parity_bit = vif.rx;
+
+        `uvm_info(
+            "UART_RX_MONITOR",
+            $sformatf(
+                "Observed UART parity bit=%0b",
+                req.parity_bit
+            ),
+            UVM_HIGH
+        )
 
     endtask
 
@@ -123,12 +187,13 @@ localparam int HALF_CLKS_PER_BIT = CLKS_PER_BIT / 2;     // 217
         else begin
 
             frame_valid = 1'b1;
+
             uaprx.write(req);
 
         end
 
     endtask
-    
+
 endclass
 
 `endif

@@ -1,21 +1,41 @@
-`ifndef STAT_FRAME_ERROR_TEST_SV
-`define STAT_FRAME_ERROR_TEST_SV
+/*
+Bug/Design Gap: CTRL parity configuration bits are implemented in the register map but are not connected to the UART TX/RX parity configuration. Parity behavior is currently controlled only by compile-time parameters.
+*/
 
-class stat_frame_error_test extends tb_base_test;
+`ifndef STAT_RX_PARITY_BIT_TEST_SV
+`define STAT_RX_PARITY_BIT_TEST_SV
 
-    `uvm_component_utils(stat_frame_error_test)
+class stat_rx_parity_bit_test extends tb_base_test;
+
+    `uvm_component_utils(stat_rx_parity_bit_test)
 
     function new(
-        string name = "stat_frame_error_test",
+        string name = "stat_rx_parity_bit_test",
         uvm_component parent = null
     );
         super.new(name, parent);
     endfunction
 ///////////////////////////////////////////////////////////////////////
 
+
+    function void build_phase(uvm_phase phase);
+
+        uvm_config_db#(bit)::set(
+            this,
+            "env.uart_agt.rx_monitor",
+            "parity_en",
+            1'b1
+        );
+
+        super.build_phase(phase);
+
+    endfunction
+
+
+
     task run_phase(uvm_phase phase);
 
-        localparam int NUM_GOOD_BYTES = 1;
+        localparam int NUM_RX_BYTES = 2;
         apb_enable             seq_en;
         uart_rx_multi_sequence seq1;
         uart_rx_multi_sequence seq1_error;
@@ -34,7 +54,7 @@ class stat_frame_error_test extends tb_base_test;
 
 
         // ------------------------------------------------
-        // 1. UART and RX disable
+        // 1. Enable UART and RX 
         // CTRL = 0x05
         // ------------------------------------------------
         seq_en.start(env.apb_agt.sequencer);
@@ -43,32 +63,20 @@ class stat_frame_error_test extends tb_base_test;
         // ------------------------------------------------
         // Fill 1 error Byte
         // ------------------------------------------------
-        assert(
-            seq1_error.randomize() with {
-                num_bytes == 1;
-                inject_frame_error == 1;
-            }
-        )
-        else
-            `uvm_fatal(
-                "STAT_FRAME_ERROR_TEST",
-                "1 error byte sequence randomization failed"
-            )
 
-        seq1_error.start(env.uart_agt.sequencer);
-         ///////////////////////////////////////////////////////////SVA PART to check the flag
-        #100us;
-
-
-/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////GOOD One
         assert(
             seq1.randomize() with {
                 num_bytes == 1;
+                parity_en == 1;
+                parity_odd == 0;
+                inject_parity_error == 0;
+                inject_frame_error == 0;
             }
         )
         else
             `uvm_fatal(
-                "STAT_FRAME_ERROR_TEST",
+                "STAT_PARITY_ERROR_TEST",
                 "1 normal byte sequence randomization failed"
             )
 
@@ -76,13 +84,39 @@ class stat_frame_error_test extends tb_base_test;
         seq_stat.start(env.apb_agt.sequencer);
 
         #100us;
+
+/////////////////////////////////////////////////////BAD One
+
+
+
+        assert(
+            seq1_error.randomize() with {
+                num_bytes == 1;
+                parity_en == 1;
+                parity_odd == 0;
+                inject_parity_error == 1;
+                inject_frame_error == 0;
+            }
+        )
+        else
+            `uvm_fatal(
+                "STAT_PARITY_ERROR_TEST",
+                "1 error byte sequence randomization failed"
+            )
+
+        seq1_error.start(env.uart_agt.sequencer);
+
+        #100us;
+
+
+/////////////////////////////////////////////////////////////////////////
  
         // ------------------------------------------------
         //  Read RXDATA once for right byte
         //
         // ------------------------------------------------
 
-        for (int i = 0; i < NUM_GOOD_BYTES; i++) begin
+        for (int i = 0; i < NUM_RX_BYTES; i++) begin
 
             apb_read = apb_read_sequence::type_id::create(
                 $sformatf("apb_seq_%0d", i)

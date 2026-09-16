@@ -6,11 +6,12 @@ class uart_driver extends uvm_driver #(uart_item);
     `uvm_component_utils(uart_driver)
 
     virtual uart_if.DRIVER vif;
-///////////////////////////////////////////////conner case
-    int unsigned inter_frame_gap_bits = 1;
-///////////////////////////////////////////////
     localparam int CLKS_PER_BIT = 50_000_000 / 115_200;
+///////////////////////////////////////////////conner case
 
+    int unsigned inter_frame_gap_bits = 1;
+
+////////////////////////////////////////////////////////////////////
     function new(
         string name = "uart_driver",
         uvm_component parent = null
@@ -64,46 +65,83 @@ class uart_driver extends uvm_driver #(uart_item);
 
 
     task drive_uart(uart_item req);
-
-        vif.rx <= 1'b1;
-
-        // start
+    
+        bit parity_bit;
+    
+        // ------------------------------------------------
+        // Calculate parity bit
+        // ------------------------------------------------
+        parity_bit = req.parity_odd
+                   ? ~^req.data
+                   :  ^req.data;
+    
+        if (req.inject_parity_error)
+            parity_bit = ~parity_bit;
+    
+    
+        // ------------------------------------------------
+        // UART start bit
+        // ------------------------------------------------
         vif.rx <= 1'b0;
         wait_bit_time();
-
-        // data
+    
+    
+        // ------------------------------------------------
+        // UART data bits
+        // ------------------------------------------------
         for (int i = 0; i < 8; i++) begin
+        
             vif.rx <= req.data[i];
             wait_bit_time();
+    
         end
-
-        // stop
-
+    
+    
+        // ------------------------------------------------
+        // Optional parity bit
+        // ------------------------------------------------
+        if (req.parity_en) begin
+        
+            vif.rx <= parity_bit;
+            wait_bit_time();
+    
+        end
+    
+    
+        // ------------------------------------------------
+        // Stop bit
+        // ------------------------------------------------
         vif.rx <= !req.inject_frame_error;
         wait_bit_time();
-        
-        // return UART line to idle
+    
+    
+        // ------------------------------------------------
+        // Return UART line to idle
+        // ------------------------------------------------
         vif.rx <= 1'b1;
-        
-        // extra idle gap, only between frames
-        repeat (CLKS_PER_BIT * inter_frame_gap_bits)
-        @(posedge vif.clk);
-            `uvm_info(
-                "UART_DRIVER",
-                $sformatf(
-                    "Driving UART data=0x%02h frame_error=%0b",
-                    req.data,
-                    req.inject_frame_error
-                ),
-                UVM_MEDIUM
-            )
-
-
-
-        // extra idle gap, only between frames
+    
+    
+        `uvm_info(
+            "UART_DRIVER",
+            $sformatf(
+                "Driving UART data=0x%02h parity_en=%0b parity_odd=%0b parity_bit=%0b parity_error=%0b frame_error=%0b",
+                req.data,
+                req.parity_en,
+                req.parity_odd,
+                parity_bit,
+                req.inject_parity_error,
+                req.inject_frame_error
+            ),
+            UVM_MEDIUM
+        )
+    
+    
+        // ------------------------------------------------
+        // Extra idle gap between frames
+        // ------------------------------------------------
         repeat (CLKS_PER_BIT * inter_frame_gap_bits)
             @(posedge vif.clk);
-
+    
     endtask
 
     task wait_bit_time();
