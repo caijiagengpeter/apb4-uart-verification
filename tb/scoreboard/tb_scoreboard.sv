@@ -1,3 +1,27 @@
+/*
+write_apb()
+    ├─ TXDATA model
+    ├─ RXDATA compare
+    └─ STAT compare
+
+write_uart_tx_start()
+    └─ TX FIFO dequeue / TX_BUSY=1
+
+write_uart_tx()
+    └─ TX data compare / TX_BUSY=0
+
+write_uart_rx_start()
+    └─ RX_BUSY=1
+
+write_uart_rx()
+    ├─ parity reference check
+    ├─ RX FIFO model push
+    └─ RX_BUSY=0
+
+check_phase()
+    └─ end-of-test consistency
+*/
+
 `ifndef TB_SCOREBOARD_SV
 `define TB_SCOREBOARD_SV
 
@@ -38,6 +62,10 @@ class tb_scoreboard extends uvm_scoreboard;
 
     // STAT bit[1] for RX
     logic expected_rx_busy = 1'b0;
+
+    //STAT bit[4] for RX
+    int unsigned parity_good_count = 0;
+    int unsigned parity_error_count = 0;
 
     // ============================================================
     // Analysis implementations
@@ -244,10 +272,10 @@ class tb_scoreboard extends uvm_scoreboard;
     end
     endfunction
 
+    // ============================================================
+    // UART RX monitor callback
+    // ============================================================
 
-    // ============================================================
-    // UART TX monitor callback
-    // ============================================================
     function void write_uart_tx(uart_item tr);
 
         logic [7:0] expected_data;
@@ -256,72 +284,42 @@ class tb_scoreboard extends uvm_scoreboard;
 
             `uvm_error(
                 "TB_SCOREBOARD",
-                "Unexpected UART transmission"
+                "UART TX completed but expected TX queue is empty"
             )
 
-            return;
-
         end
+        else begin
 
-        expected_data = expected_tx_queue.pop_front();
+            expected_data = expected_tx_queue.pop_front();
 
-        if (tr.data !== expected_data) begin
+            if (tr.data !== expected_data) begin
 
-            `uvm_error(
-                "TB_SCOREBOARD",
-                $sformatf(
-                    "UART TX data mismatch: expected 0x%02h, got 0x%02h",
-                    expected_data,
-                    tr.data
+                `uvm_error(
+                    "TB_SCOREBOARD",
+                    $sformatf(
+                        "TX data mismatch: expected=0x%02h actual=0x%02h",
+                        expected_data,
+                        tr.data
+                    )
                 )
-            )
+
+            end
+            else begin
+
+                `uvm_info(
+                    "TB_SCOREBOARD",
+                    $sformatf(
+                        "TX data match: 0x%02h",
+                        tr.data
+                    ),
+                    UVM_MEDIUM
+                )
+
+            end
 
         end
-        else begin
 
-            `uvm_info(
-                "TB_SCOREBOARD",
-                $sformatf(
-                    "UART TX data match: 0x%02h",
-                    tr.data
-                ),
-                UVM_MEDIUM
-            )
-
-        end
         expected_tx_busy = 1'b0;
-
-    endfunction
-/////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////
-
-
-    function void write_uart_tx_start(uart_item tr);
-        expected_tx_busy = 1'b1;
-
-        if (tx_fifo_count == 0) begin
-
-            `uvm_error(
-                "TB_SCOREBOARD",
-                "UART TX started while TX FIFO model is empty"
-            )
-
-        end
-        else begin
-
-            tx_fifo_count--;
-
-            `uvm_info(
-                "TB_SCOREBOARD",
-                $sformatf(
-                    "TX FIFO model pop at frame start: count=%0d",
-                    tx_fifo_count
-                ),
-                UVM_HIGH
-            )
-
-        end
 
     endfunction
 
@@ -329,16 +327,70 @@ class tb_scoreboard extends uvm_scoreboard;
     // UART RX monitor callback
     // ============================================================
     function void write_uart_rx(uart_item tr);
+    
+        bit expected_parity;
+    
+        // ========================================================
+        // 1. Parity reference checking
+        // ========================================================
+        if (tr.parity_en) begin
+            
+            if(tr.parity_odd) begin
+                expected_parity = ~^tr.data;
+            end
+            // 8E1: even parity
+            else begin
+                expected_parity = ^tr.data;
+            end
 
-        // DUT RX FIFO still has space
+            if (tr.parity_bit !== expected_parity) begin
+            
+                parity_error_count++;
+    
+                `uvm_info(
+                    "TB_SCOREBOARD",
+                    $sformatf(
+                        "RX parity error: data=0x%02h expected=%0b actual=%0b error_count=%0d",
+                        tr.data,
+                        expected_parity,
+                        tr.parity_bit,
+                        parity_error_count
+                    ),
+                    UVM_MEDIUM
+                )
+    
+            end
+            else begin
+            
+                parity_good_count++;
+    
+                `uvm_info(
+                    "TB_SCOREBOARD",
+                    $sformatf(
+                        "RX parity correct: data=0x%02h parity=%0b good_count=%0d",
+                        tr.data,
+                        tr.parity_bit,
+                        parity_good_count
+                    ),
+                    UVM_MEDIUM
+                )
+    
+            end
+    
+        end
+    
+    
+        // ========================================================
+        // 2. RX FIFO reference model
+        //
+        // Current DUT behavior:
+        // parity error does NOT drop received data.
+        // ========================================================
         if (rx_fifo_count < FIFO_DEPTH) begin
-
-            expected_rx_queue.push_back(
-                tr.data
-            );
-
+        
+            expected_rx_queue.push_back(tr.data);
             rx_fifo_count++;
-
+    
             `uvm_info(
                 "TB_SCOREBOARD",
                 $sformatf(
@@ -348,12 +400,10 @@ class tb_scoreboard extends uvm_scoreboard;
                 ),
                 UVM_HIGH
             )
-
+    
         end
-
-        // DUT RX FIFO already full
         else begin
-
+        
             `uvm_info(
                 "TB_SCOREBOARD",
                 $sformatf(
@@ -362,10 +412,52 @@ class tb_scoreboard extends uvm_scoreboard;
                 ),
                 UVM_MEDIUM
             )
-
+    
         end
+    
+    
+        // ========================================================
+        // 3. RX frame completed
+        // ========================================================
         expected_rx_busy = 1'b0;
+    
     endfunction
+    /////////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////
+    
+    
+        function void write_uart_tx_start(uart_item tr);
+            expected_tx_busy = 1'b1;
+    
+            if (tx_fifo_count == 0) begin
+            
+                `uvm_error(
+                    "TB_SCOREBOARD",
+                    "UART TX started while TX FIFO model is empty"
+                )
+    
+            end
+            else begin
+            
+                tx_fifo_count--;
+    
+                `uvm_info(
+                    "TB_SCOREBOARD",
+                    $sformatf(
+                        "TX FIFO model pop at frame start: count=%0d",
+                        tx_fifo_count
+                    ),
+                    UVM_HIGH
+                )
+    
+            end
+    
+        endfunction
+
+    // ============================================================
+    // UART RX monitor callback
+    // ============================================================
 
 //////////////////////////////////////////////////////////////////function receive the start, means the rx_busy = 1'b1;
     function void write_uart_rx_start(uart_item tr);
@@ -446,6 +538,15 @@ class tb_scoreboard extends uvm_scoreboard;
                 "No STAT register check was performed"
             )
         end
+    `uvm_info(
+        "TB_SCOREBOARD",
+        $sformatf(
+            "RX parity summary: good=%0d error=%0d",
+            parity_good_count,
+            parity_error_count
+        ),
+        UVM_LOW
+    )
 
     endfunction
 

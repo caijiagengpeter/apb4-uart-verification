@@ -51,6 +51,7 @@ package apb_pkg;
     `include "stat_rx_busy_bit_test.sv"
     `include "stat_frame_error_test.sv"
     `include "stat_rx_parity_bit_test.sv"
+    `include "stat_rx_parity_odd_bit_test.sv"
     
 
 

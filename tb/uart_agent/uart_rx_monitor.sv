@@ -15,6 +15,7 @@ class uart_rx_monitor extends uvm_monitor;
 
     // Monitor configuration
     bit parity_en = 1'b0;
+    bit parity_odd = 1'b0;
 
     function new(
         string name = "uart_rx_monitor",
@@ -44,9 +45,9 @@ class uart_rx_monitor extends uvm_monitor;
             )
 
         end
-
         // Default remains parity disabled.
         // Parity-enabled tests can override this through config_db.
+
         if (!uvm_config_db#(bit)::get(
                 this,
                 "",
@@ -55,6 +56,17 @@ class uart_rx_monitor extends uvm_monitor;
             )) begin
 
             parity_en = 1'b0;
+
+        end
+
+        if (!uvm_config_db#(bit)::get(
+                this,
+                "",
+                "parity_odd",
+                parity_odd
+            )) begin
+
+            parity_odd = 1'b0;
 
         end
 
@@ -75,6 +87,8 @@ class uart_rx_monitor extends uvm_monitor;
             wait_start_bit();
 
             // RX transaction has started
+            req.parity_en = parity_en;
+            req.parity_odd = 1'b0; 
             uap_rx_start.write(req);
 
             // Sample 8 data bits
