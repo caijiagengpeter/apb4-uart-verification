@@ -149,3 +149,8 @@ parity_odd_error:
 	$(MAKE) clean
 	$(MAKE) compile_parity_odd
 	./simv +UVM_TESTNAME=stat_rx_parity_odd_bit_test | tee simv.log
+
+tx_empty_irq:
+	$(MAKE) clean
+	$(MAKE) compile
+	./simv +UVM_TESTNAME=int_tx_empty_test | tee simv.log

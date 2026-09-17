@@ -1,7 +1,6 @@
 `ifndef UART_BIND_SV
 `define UART_BIND_SV
 
-
 bind uart_controller uart_assertions uart_assertions_inst (
 
     .pclk_i              (pclk_i),
@@ -18,9 +17,14 @@ bind uart_controller uart_assertions uart_assertions_inst (
 
     // RX parity error
     .uart_rx_parity_err  (uart_rx_parity_err),
-    .stat_parity_err     (stat_parity_err)
+    .stat_parity_err     (stat_parity_err),
+
+    // TX empty IRQ
+    .tx_fifo_empty       (tx_fifo_empty),
+    .ctrl_tx_enable      (ctrl_tx_enable),
+    .int_tx_empty_en     (int_tx_empty_en),
+    .irq_tx_empty_o      (irq_tx_empty_o)
 
 );
-
 
 `endif

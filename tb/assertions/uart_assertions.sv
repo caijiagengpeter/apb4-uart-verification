@@ -21,7 +21,13 @@ module uart_assertions (
 
     // RX parity error
     input logic uart_rx_parity_err,
-    input logic stat_parity_err
+    input logic stat_parity_err,
+
+    // TX FIFO Empty error
+    input logic tx_fifo_empty,
+    input logic ctrl_tx_enable,
+    input logic int_tx_empty_en,
+    input logic irq_tx_empty_o
 
 );
 
@@ -38,6 +44,10 @@ module uart_assertions (
 
     int unsigned rx_parity_hit_count    = 0;
     int unsigned rx_parity_fail_count   = 0;
+
+    int unsigned tx_fifo_empty_hit_count  = 0;
+    int unsigned tx_fifo_empty_fail_count = 0;
+    int unsigned tx_fifo_not_empty_hit_count = 0;
 
 
     // ============================================================
@@ -272,6 +282,57 @@ module uart_assertions (
 
 
     // ============================================================
+    // TX FIFO empty assertions
+    // ============================================================
+
+    property p_tx_empty_irq_assert;
+        @(posedge pclk_i) disable iff (!presetn_i)
+        (tx_fifo_empty &&
+         ctrl_tx_enable &&
+         int_tx_empty_en)
+        |-> irq_tx_empty_o;
+    endproperty
+
+    a_tx_empty_irq_assert:
+        assert property (p_tx_empty_irq_assert)
+        else begin
+            tx_fifo_empty_fail_count++;
+
+            `uvm_error(
+                "SVA_TX_EMPTY_IRQ",
+                $sformatf(
+                    "TX_EMPTY IRQ assertion failed, fail_count=%0d",
+                    tx_fifo_empty_fail_count
+                )
+            )
+        end
+
+
+    property p_tx_empty_irq_no_spurious;
+        @(posedge pclk_i) disable iff (!presetn_i)
+        irq_tx_empty_o
+        |->
+        (tx_fifo_empty &&
+         ctrl_tx_enable &&
+         int_tx_empty_en);
+    endproperty
+
+    a_tx_empty_irq_no_spurious:
+        assert property (p_tx_empty_irq_no_spurious)
+        else begin
+            tx_fifo_empty_fail_count++;
+
+            `uvm_error(
+                "SVA_TX_EMPTY_IRQ",
+                $sformatf(
+                    "Spurious TX_EMPTY IRQ detected, fail_count=%0d",
+                    tx_fifo_empty_fail_count
+                )
+            )
+        end
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////Cover
+    // ============================================================
     // Cover: RX overrun
     // ============================================================
 
@@ -360,6 +421,31 @@ module uart_assertions (
 
         end
 
+    // ============================================================
+    // Cover: TX FIFO empty error
+    // ============================================================
+
+    c_tx_empty_irq_seen:
+        cover property (
+            @(posedge pclk_i) disable iff (!presetn_i)
+            irq_tx_empty_o
+        )
+        begin
+            tx_fifo_empty_hit_count++;
+        end
+
+        c_tx_not_empty_irq_low_seen:
+    cover property (
+            @(posedge pclk_i) disable iff (!presetn_i)
+            (!tx_fifo_empty &&
+             ctrl_tx_enable &&
+             int_tx_empty_en &&
+             !irq_tx_empty_o)
+        )
+        begin
+            tx_fifo_not_empty_hit_count++;
+        end
+
 
     // ============================================================
     // Confirm assertion module is active
@@ -412,6 +498,19 @@ module uart_assertions (
             ),
             UVM_LOW
         )
+
+
+        `uvm_info(
+            "SVA_SUMMARY",
+            $sformatf(
+                "TX_EMPTY IRQ SVA: irq_high_hits=%0d irq_low_hits=%0d fails=%0d",
+                tx_fifo_empty_hit_count,
+                tx_fifo_not_empty_hit_count,
+                tx_fifo_empty_fail_count
+            ),
+            UVM_LOW
+        )
+
 
     end
 

@@ -24,6 +24,7 @@ package apb_pkg;
     `include "apb_smoke_sequence.sv"
     `include "uart_tx_smoke_sequence.sv"
     `include "apb_enable.sv"
+    `include "apb_int_tx_empty_enable.sv"
     `include "apb_read_stat.sv"
     `include "apb_rx_enable.sv"
     `include "apb_tx_enable.sv"
@@ -52,6 +53,7 @@ package apb_pkg;
     `include "stat_frame_error_test.sv"
     `include "stat_rx_parity_bit_test.sv"
     `include "stat_rx_parity_odd_bit_test.sv"
+    `include "int_tx_empty_test.sv"
     
 
 
