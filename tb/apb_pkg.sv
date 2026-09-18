@@ -34,6 +34,8 @@ package apb_pkg;
     `include "uart_tx_multi_sequence.sv"
     `include "uart_rx_multi_sequence.sv"
 
+    // Coverage
+    `include "uart_coverage.sv"
 
     // Scoreboard
     `include "tb_scoreboard.sv"
@@ -57,6 +59,8 @@ package apb_pkg;
     `include "stat_rx_parity_odd_bit_test.sv"
     `include "int_tx_empty_test.sv"
     `include "int_rx_full_test.sv"
+
+
     
 
 

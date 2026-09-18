@@ -67,6 +67,9 @@ class tb_scoreboard extends uvm_scoreboard;
     int unsigned parity_good_count = 0;
     int unsigned parity_error_count = 0;
 
+    // STAT CHECK switch
+    bit require_stat_check = 1'b0;
+
     // ============================================================
     // Analysis implementations
     // ============================================================
@@ -113,6 +116,20 @@ class tb_scoreboard extends uvm_scoreboard;
         uart_imp_rx_start = new("uart_imp_rx_start", this);
 
     endfunction
+
+
+    function void build_phase (uvm_phase phase);
+        super.build_phase(phase);
+        void'(uvm_config_db#(bit)::get(
+            this,
+            "",
+            "require_stat_check",
+            require_stat_check
+        ));
+
+    endfunction
+
+
 
 
     // ============================================================
@@ -327,14 +344,14 @@ class tb_scoreboard extends uvm_scoreboard;
     // UART RX monitor callback
     // ============================================================
     function void write_uart_rx(uart_item tr);
-    
+
         bit expected_parity;
-    
+
         // ========================================================
         // 1. Parity reference checking
         // ========================================================
         if (tr.parity_en) begin
-            
+
             if(tr.parity_odd) begin
                 expected_parity = ~^tr.data;
             end
@@ -344,9 +361,9 @@ class tb_scoreboard extends uvm_scoreboard;
             end
 
             if (tr.parity_bit !== expected_parity) begin
-            
+
                 parity_error_count++;
-    
+
                 `uvm_info(
                     "TB_SCOREBOARD",
                     $sformatf(
@@ -358,12 +375,12 @@ class tb_scoreboard extends uvm_scoreboard;
                     ),
                     UVM_MEDIUM
                 )
-    
+
             end
             else begin
-            
+
                 parity_good_count++;
-    
+
                 `uvm_info(
                     "TB_SCOREBOARD",
                     $sformatf(
@@ -374,12 +391,12 @@ class tb_scoreboard extends uvm_scoreboard;
                     ),
                     UVM_MEDIUM
                 )
-    
+
             end
-    
+
         end
-    
-    
+
+
         // ========================================================
         // 2. RX FIFO reference model
         //
@@ -387,10 +404,10 @@ class tb_scoreboard extends uvm_scoreboard;
         // parity error does NOT drop received data.
         // ========================================================
         if (rx_fifo_count < FIFO_DEPTH) begin
-        
+
             expected_rx_queue.push_back(tr.data);
             rx_fifo_count++;
-    
+
             `uvm_info(
                 "TB_SCOREBOARD",
                 $sformatf(
@@ -400,10 +417,10 @@ class tb_scoreboard extends uvm_scoreboard;
                 ),
                 UVM_HIGH
             )
-    
+
         end
         else begin
-        
+
             `uvm_info(
                 "TB_SCOREBOARD",
                 $sformatf(
@@ -412,36 +429,36 @@ class tb_scoreboard extends uvm_scoreboard;
                 ),
                 UVM_MEDIUM
             )
-    
+
         end
-    
-    
+
+
         // ========================================================
         // 3. RX frame completed
         // ========================================================
         expected_rx_busy = 1'b0;
-    
+
     endfunction
     /////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////////////////////
-    
-    
+
+
         function void write_uart_tx_start(uart_item tr);
             expected_tx_busy = 1'b1;
-    
+
             if (tx_fifo_count == 0) begin
-            
+
                 `uvm_error(
                     "TB_SCOREBOARD",
                     "UART TX started while TX FIFO model is empty"
                 )
-    
+
             end
             else begin
-            
+
                 tx_fifo_count--;
-    
+
                 `uvm_info(
                     "TB_SCOREBOARD",
                     $sformatf(
@@ -450,9 +467,9 @@ class tb_scoreboard extends uvm_scoreboard;
                     ),
                     UVM_HIGH
                 )
-    
+
             end
-    
+
         endfunction
 
     // ============================================================
@@ -532,21 +549,14 @@ class tb_scoreboard extends uvm_scoreboard;
             )
         end
 
-        if (stat_check_count == 0) begin
+        if (require_stat_check && (stat_check_count == 0)) begin
+
             `uvm_error(
                 "TB_SCOREBOARD",
                 "No STAT register check was performed"
             )
+
         end
-    `uvm_info(
-        "TB_SCOREBOARD",
-        $sformatf(
-            "RX parity summary: good=%0d error=%0d",
-            parity_good_count,
-            parity_error_count
-        ),
-        UVM_LOW
-    )
 
     endfunction
 

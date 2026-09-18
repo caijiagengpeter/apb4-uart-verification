@@ -8,6 +8,7 @@ class tb_env extends uvm_env;
     apb_agent  apb_agt;
     uart_agent uart_agt;
     tb_scoreboard scoreboard;
+    uart_coverage uart_cov;
 
     function new(
         string name = "tb_env",
@@ -23,6 +24,7 @@ class tb_env extends uvm_env;
         apb_agt   = apb_agent::type_id::create("apb_agt", this);
         uart_agt  = uart_agent::type_id::create("uart_agt", this);
         scoreboard = tb_scoreboard::type_id::create("scoreboard", this);
+        uart_cov = uart_coverage::type_id::create("uart_cov",this);
     endfunction
 
     function void connect_phase(uvm_phase phase);
@@ -33,6 +35,7 @@ class tb_env extends uvm_env;
         uart_agt.rx_monitor.uaprx.connect(scoreboard.uart_imp_rx);
         uart_agt.tx_monitor.uap_start.connect(scoreboard.uart_imp_tx_start);
         uart_agt.rx_monitor.uap_rx_start.connect(scoreboard.uart_imp_rx_start);
+        uart_agt.rx_monitor.uaprx.connect(uart_cov.analysis_export);
 
     endfunction
 

@@ -88,7 +88,7 @@ class uart_rx_monitor extends uvm_monitor;
 
             // RX transaction has started
             req.parity_en = parity_en;
-            req.parity_odd = 1'b0; 
+            req.parity_odd = parity_odd;
             uap_rx_start.write(req);
 
             // Sample 8 data bits
