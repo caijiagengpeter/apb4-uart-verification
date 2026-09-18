@@ -154,3 +154,8 @@ tx_empty_irq:
 	$(MAKE) clean
 	$(MAKE) compile
 	./simv +UVM_TESTNAME=int_tx_empty_test | tee simv.log
+
+rx_full_irq:
+	$(MAKE) clean
+	$(MAKE) compile
+	./simv +UVM_TESTNAME=int_rx_full_test | tee simv.log

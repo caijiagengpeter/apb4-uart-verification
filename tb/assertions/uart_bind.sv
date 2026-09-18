@@ -23,7 +23,12 @@ bind uart_controller uart_assertions uart_assertions_inst (
     .tx_fifo_empty       (tx_fifo_empty),
     .ctrl_tx_enable      (ctrl_tx_enable),
     .int_tx_empty_en     (int_tx_empty_en),
-    .irq_tx_empty_o      (irq_tx_empty_o)
+    .irq_tx_empty_o      (irq_tx_empty_o),
+    
+    // RX full IRQ
+    .ctrl_rx_enable     (ctrl_rx_enable),
+    .int_rx_full_en     (int_rx_full_en),
+    .irq_rx_full_o      (irq_rx_full_o)
 
 );
 

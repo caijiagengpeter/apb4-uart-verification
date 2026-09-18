@@ -25,6 +25,7 @@ package apb_pkg;
     `include "uart_tx_smoke_sequence.sv"
     `include "apb_enable.sv"
     `include "apb_int_tx_empty_enable.sv"
+    `include "apb_int_rx_full_enable.sv"
     `include "apb_read_stat.sv"
     `include "apb_rx_enable.sv"
     `include "apb_tx_enable.sv"
@@ -32,6 +33,7 @@ package apb_pkg;
     `include "apb_read_sequence.sv"
     `include "uart_tx_multi_sequence.sv"
     `include "uart_rx_multi_sequence.sv"
+
 
     // Scoreboard
     `include "tb_scoreboard.sv"
@@ -54,6 +56,7 @@ package apb_pkg;
     `include "stat_rx_parity_bit_test.sv"
     `include "stat_rx_parity_odd_bit_test.sv"
     `include "int_tx_empty_test.sv"
+    `include "int_rx_full_test.sv"
     
 
 

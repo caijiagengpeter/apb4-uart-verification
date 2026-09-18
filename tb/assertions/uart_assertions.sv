@@ -27,7 +27,14 @@ module uart_assertions (
     input logic tx_fifo_empty,
     input logic ctrl_tx_enable,
     input logic int_tx_empty_en,
-    input logic irq_tx_empty_o
+    input logic irq_tx_empty_o,
+
+    // RX FIFO Full error
+    //input logic rx_fifo_full, //already have above
+    input logic ctrl_rx_enable,
+    input logic int_rx_full_en,
+    input logic irq_rx_full_o
+    
 
 );
 
@@ -49,6 +56,9 @@ module uart_assertions (
     int unsigned tx_fifo_empty_fail_count = 0;
     int unsigned tx_fifo_not_empty_hit_count = 0;
 
+    int unsigned rx_full_irq_high_hit_count = 0;
+    int unsigned rx_full_irq_low_hit_count  = 0;
+    int unsigned rx_full_irq_fail_count     = 0;
 
     // ============================================================
     // RX overrun assertions
@@ -331,6 +341,61 @@ module uart_assertions (
             )
         end
 
+    // ============================================================
+    // RX FIFO full assertions
+    // ============================================================
+
+    property p_rx_full_irq_assert;
+        @(posedge pclk_i) disable iff (!presetn_i)
+        (rx_fifo_full &&
+         ctrl_rx_enable &&
+         int_rx_full_en)
+        |-> irq_rx_full_o;
+    endproperty
+
+
+    a_rx_full_irq_assert:
+        assert property (p_rx_full_irq_assert)
+        else begin
+
+            rx_full_irq_fail_count++;
+
+            `uvm_error(
+                "SVA_RX_FULL_IRQ",
+                $sformatf(
+                    "RX_FULL IRQ was not asserted when RX FIFO was full, fail_count=%0d",
+                    rx_full_irq_fail_count
+                )
+            )
+
+        end
+
+    property p_rx_full_irq_no_spurious;
+        @(posedge pclk_i) disable iff (!presetn_i)
+        irq_rx_full_o
+        |->
+        (rx_fifo_full &&
+         ctrl_rx_enable &&
+         int_rx_full_en);
+    endproperty
+
+
+    a_rx_full_irq_no_spurious:
+        assert property (p_rx_full_irq_no_spurious)
+        else begin
+
+            rx_full_irq_fail_count++;
+
+            `uvm_error(
+                "SVA_RX_FULL_IRQ",
+                $sformatf(
+                    "Spurious RX_FULL IRQ detected, fail_count=%0d",
+                    rx_full_irq_fail_count
+                )
+            )
+
+        end
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////Cover
     // ============================================================
     // Cover: RX overrun
@@ -446,7 +511,29 @@ module uart_assertions (
             tx_fifo_not_empty_hit_count++;
         end
 
+    // ============================================================
+    // Cover: RX FIFO full error
+    // ============================================================
+    c_rx_full_irq_rise:
+        cover property (
+            @(posedge pclk_i) disable iff (!presetn_i)
+            $rose(irq_rx_full_o)
+        )
+        begin
+            rx_full_irq_high_hit_count++;
+        end
 
+    c_rx_full_irq_fall:
+       cover property (
+           @(posedge pclk_i) disable iff (!presetn_i)
+           $fell(irq_rx_full_o)
+       )
+       begin
+           rx_full_irq_low_hit_count++;
+       end
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////
     // ============================================================
     // Confirm assertion module is active
     // ============================================================
@@ -511,6 +598,16 @@ module uart_assertions (
             UVM_LOW
         )
 
+        `uvm_info(
+            "SVA_SUMMARY",
+            $sformatf(
+                "RX_FULL IRQ SVA: irq_rise_hits=%0d irq_fall_hits=%0d fails=%0d",
+                rx_full_irq_high_hit_count,
+                rx_full_irq_low_hit_count,
+                rx_full_irq_fail_count
+            ),
+            UVM_LOW
+        )
 
     end
 
