@@ -24,11 +24,20 @@ bind uart_controller uart_assertions uart_assertions_inst (
     .ctrl_tx_enable      (ctrl_tx_enable),
     .int_tx_empty_en     (int_tx_empty_en),
     .irq_tx_empty_o      (irq_tx_empty_o),
-    
+
     // RX full IRQ
     .ctrl_rx_enable     (ctrl_rx_enable),
     .int_rx_full_en     (int_rx_full_en),
-    .irq_rx_full_o      (irq_rx_full_o)
+    .irq_rx_full_o      (irq_rx_full_o),
+
+    // APB interface (RX fifo Boundary)
+    .psel_i(psel_i),
+    .penable_i(penable_i),
+    .pwrite_i(pwrite_i),
+    .paddr_i(paddr_i),
+
+    .rx_fifo_empty(rx_fifo_empty),
+    .rx_fifo_rd_en(rx_fifo_rd_en)
 
 );
 

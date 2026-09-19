@@ -133,10 +133,10 @@ class uart_rx_fifo_boundary_test extends tb_base_test;
 
         // ------------------------------------------------
         // 9. Read RXDATA once for each byte
-        //
+        // "=" is for the bondary test
         // ------------------------------------------------
 
-        for (int i = 0; i < FIFO_DEPTH; i++) begin
+        for (int i = 0; i <= FIFO_DEPTH; i++) begin
 
             apb_read = apb_read_sequence::type_id::create(
                 $sformatf("apb_seq_%0d", i)

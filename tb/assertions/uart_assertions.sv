@@ -33,8 +33,18 @@ module uart_assertions (
     //input logic rx_fifo_full, //already have above
     input logic ctrl_rx_enable,
     input logic int_rx_full_en,
-    input logic irq_rx_full_o
-    
+    input logic irq_rx_full_o,
+
+    // APB signals
+    input logic       psel_i,
+    input logic       penable_i,
+    input logic       pwrite_i,
+    input logic [7:0] paddr_i,
+
+    // RX FIFO empty-read check
+    input logic rx_fifo_empty,
+    input logic rx_fifo_rd_en
+
 
 );
 
@@ -396,6 +406,31 @@ module uart_assertions (
 
         end
 
+    // ============================================================
+    // RX FIFO empty and reading it
+    // ============================================================
+
+        property p_no_rx_fifo_read_when_empty;
+            @(posedge pclk_i)
+            disable iff (!presetn_i)
+
+            (psel_i &&
+             penable_i &&
+             !pwrite_i &&
+             (paddr_i == 8'h0C) &&
+             rx_fifo_empty)
+            |-> !rx_fifo_rd_en;
+        endproperty
+
+        a_no_rx_fifo_read_when_empty:
+            assert property (p_no_rx_fifo_read_when_empty)
+            else begin
+                `uvm_error(
+                    "UART_SVA",
+                    "RX FIFO read enable asserted while FIFO empty"
+                )
+            end
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////Cover
     // ============================================================
     // Cover: RX overrun
@@ -532,6 +567,21 @@ module uart_assertions (
            rx_full_irq_low_hit_count++;
        end
 
+    // ============================================================
+    // Cover: RX FIFO empty and reading it
+    // ============================================================
+
+        c_rx_read_when_empty:
+            cover property (
+                @(posedge pclk_i)
+                disable iff (!presetn_i)
+
+                psel_i &&
+                penable_i &&
+                !pwrite_i &&
+                (paddr_i == 8'h0C) &&
+                rx_fifo_empty
+            );
 
 //////////////////////////////////////////////////////////////////////////////////////////////
     // ============================================================
@@ -608,6 +658,10 @@ module uart_assertions (
             ),
             UVM_LOW
         )
+
+
+
+
 
     end
 

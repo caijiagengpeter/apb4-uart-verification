@@ -33,8 +33,13 @@ package apb_pkg;
     `include "apb_read_sequence.sv"
     `include "uart_tx_multi_sequence.sv"
     `include "uart_rx_multi_sequence.sv"
+    `include "apb_register_access_sequence.sv"
 
-    // Coverage
+// Coverage / Status
+    `include "fifo_corner_item.sv"
+    `include "uart_status_item.sv"
+    `include "fifo_state_item.sv"
+    `include "uart_status_monitor.sv"
     `include "uart_coverage.sv"
 
     // Scoreboard
@@ -59,9 +64,11 @@ package apb_pkg;
     `include "stat_rx_parity_odd_bit_test.sv"
     `include "int_tx_empty_test.sv"
     `include "int_rx_full_test.sv"
+    `include "uart_tx_parity_test.sv"
+    `include "apb_register_access_test.sv"
 
 
-    
+
 
 
 endpackage

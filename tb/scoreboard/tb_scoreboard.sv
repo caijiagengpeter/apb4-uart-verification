@@ -31,6 +31,7 @@ check_phase()
 `uvm_analysis_imp_decl(_uart_tx_start)
 `uvm_analysis_imp_decl(_uart_rx_start)
 
+
 class tb_scoreboard extends uvm_scoreboard;
 
     `uvm_component_utils(tb_scoreboard)
@@ -69,6 +70,10 @@ class tb_scoreboard extends uvm_scoreboard;
 
     // STAT CHECK switch
     bit require_stat_check = 1'b0;
+
+    // For FIFO coverage check use (Normal and Boundary)
+    uvm_analysis_port #(fifo_state_item) fifo_state_ap;
+    uvm_analysis_port #(fifo_corner_item) fifo_corner_ap;
 
     // ============================================================
     // Analysis implementations
@@ -114,6 +119,9 @@ class tb_scoreboard extends uvm_scoreboard;
         uart_imp_rx = new("uart_imp_rx", this);
         uart_imp_tx_start = new("uart_imp_tx_start", this);
         uart_imp_rx_start = new("uart_imp_rx_start", this);
+        fifo_state_ap = new("fifo_state_ap", this);
+        fifo_corner_ap = new("fifo_corner_ap", this);
+
 
     endfunction
 
@@ -126,6 +134,8 @@ class tb_scoreboard extends uvm_scoreboard;
             "require_stat_check",
             require_stat_check
         ));
+        // initial begin push one 0
+    publish_fifo_state();
 
     endfunction
 
@@ -138,6 +148,7 @@ class tb_scoreboard extends uvm_scoreboard;
     function void write_apb(apb_item tr);
 
     logic [7:0] expected_data;
+    fifo_corner_item c;
 
     // ========================================================
     // TX: APB write TXDATA
@@ -150,6 +161,7 @@ class tb_scoreboard extends uvm_scoreboard;
 
                 expected_tx_queue.push_back(tr.wdata[7:0]);
                 tx_fifo_count++;
+                publish_fifo_state();
 
                 `uvm_info(
                     "TB_SCOREBOARD",
@@ -161,7 +173,15 @@ class tb_scoreboard extends uvm_scoreboard;
                     UVM_HIGH
                 )
 
+                if (tx_fifo_count == FIFO_DEPTH) begin
+                    c = fifo_corner_item::type_id::create("c_tx");
+                    c.tx_write_full = 1'b1;
+                    fifo_corner_ap.write(c);
+                end
+
             end
+
+
             else begin
 
                 `uvm_info(
@@ -181,52 +201,63 @@ class tb_scoreboard extends uvm_scoreboard;
     // ========================================================
     // RX: APB read RXDATA
     // ========================================================
-        if (!tr.write &&
-            (tr.addr == 8'h0C)) begin
 
-            if (rx_fifo_count == 0) begin
+    if (!tr.write &&
+        (tr.addr == 8'h0C)) begin
+
+        if (rx_fifo_count == 0) begin
+
+            `uvm_info(
+                "TB_SCOREBOARD",
+                "RXDATA read while RX FIFO model is empty",
+                UVM_MEDIUM
+            )
+
+            c = fifo_corner_item::type_id::create("rx_read_empty_corner");
+
+            c.tx_write_full   = 1'b0;
+            c.rx_receive_full = 1'b0;
+            c.rx_read_empty   = 1'b1;
+
+            fifo_corner_ap.write(c);
+
+        end
+        else begin
+
+            expected_data = expected_rx_queue.pop_front();
+
+            rx_fifo_count--;
+            publish_fifo_state();
+
+            if (tr.rdata[7:0] !== expected_data) begin
 
                 `uvm_error(
                     "TB_SCOREBOARD",
-                    "RXDATA read while RX FIFO model is empty"
+                    $sformatf(
+                        "RX data mismatch: expected 0x%02h, got 0x%02h",
+                        expected_data,
+                        tr.rdata[7:0]
+                    )
                 )
 
             end
             else begin
 
-                expected_data = expected_rx_queue.pop_front();
-
-                rx_fifo_count--;
-
-                if (tr.rdata[7:0] !== expected_data) begin
-
-                    `uvm_error(
-                        "TB_SCOREBOARD",
-                        $sformatf(
-                            "RX data mismatch: expected 0x%02h, got 0x%02h",
-                            expected_data,
-                            tr.rdata[7:0]
-                        )
-                    )
-
-                end
-                else begin
-
-                    `uvm_info(
-                        "TB_SCOREBOARD",
-                        $sformatf(
-                            "RX data match: 0x%02h, RX FIFO count=%0d",
-                            tr.rdata[7:0],
-                            rx_fifo_count
-                        ),
-                        UVM_MEDIUM
-                    )
-
-                end
+                `uvm_info(
+                    "TB_SCOREBOARD",
+                    $sformatf(
+                        "RX data match: 0x%02h, RX FIFO count=%0d",
+                        tr.rdata[7:0],
+                        rx_fifo_count
+                    ),
+                    UVM_MEDIUM
+                )
 
             end
 
         end
+
+    end
 
     // ========================================================
     // APB Check the expected_tx_full and expected_rx_empty
@@ -346,6 +377,7 @@ class tb_scoreboard extends uvm_scoreboard;
     function void write_uart_rx(uart_item tr);
 
         bit expected_parity;
+        fifo_corner_item c;
 
         // ========================================================
         // 1. Parity reference checking
@@ -407,6 +439,7 @@ class tb_scoreboard extends uvm_scoreboard;
 
             expected_rx_queue.push_back(tr.data);
             rx_fifo_count++;
+            publish_fifo_state();
 
             `uvm_info(
                 "TB_SCOREBOARD",
@@ -417,6 +450,12 @@ class tb_scoreboard extends uvm_scoreboard;
                 ),
                 UVM_HIGH
             )
+
+            if (rx_fifo_count == FIFO_DEPTH) begin
+                c = fifo_corner_item::type_id::create("rx_fifo_count");
+                c.rx_receive_full = 1'b1;
+                fifo_corner_ap.write(c);
+            end
 
         end
         else begin
@@ -458,6 +497,7 @@ class tb_scoreboard extends uvm_scoreboard;
             else begin
 
                 tx_fifo_count--;
+                publish_fifo_state();
 
                 `uvm_info(
                     "TB_SCOREBOARD",
@@ -469,6 +509,19 @@ class tb_scoreboard extends uvm_scoreboard;
                 )
 
             end
+
+        endfunction
+
+        function void publish_fifo_state();
+
+            fifo_state_item state;
+
+            state = fifo_state_item::type_id::create("state");
+
+            state.tx_count = tx_fifo_count;
+            state.rx_count = rx_fifo_count;
+
+            fifo_state_ap.write(state);
 
         endfunction
 

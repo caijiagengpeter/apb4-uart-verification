@@ -51,7 +51,13 @@ module tb_top;
     apb_if  apb_vif(pclk);
     uart_if uart_vif(pclk);
 
+    uart_status_if status_if (
+        .clk   (pclk),
+        .rst_n (apb_vif.PRESETn)
+    );
+
     assign uart_vif.rst_n = apb_vif.PRESETn;
+
 
 
     // ============================================================
@@ -134,6 +140,10 @@ module tb_top;
 
     );
 
+    assign status_if.stat_overrun_err = dut.stat_overrun_err;
+    assign status_if.irq_tx_empty = irq_tx_empty;
+    assign status_if.irq_rx_full  = irq_rx_full;
+
 
     // ============================================================
     // Optional configuration display
@@ -194,6 +204,14 @@ module tb_top;
             "uvm_test_top.env.uart_agt.rx_monitor",
             "vif",
             uart_vif
+        );
+
+        // STAT Monitor
+        uvm_config_db#(virtual uart_status_if.MONITOR)::set(
+            null,
+            "uvm_test_top.env.status_mon",
+            "vif",
+            status_if
         );
 
         // Test selected by +UVM_TESTNAME

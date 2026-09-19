@@ -12,6 +12,8 @@ class uart_rx_monitor extends uvm_monitor;
 
     uvm_analysis_port #(uart_item) uaprx;
     uvm_analysis_port #(uart_item) uap_rx_start;
+    // For Coverage test only (give the frame error item to coverage/ normal will drop, but this kept)
+    uvm_analysis_port #(uart_item) uap_frame_error;
 
     // Monitor configuration
     bit parity_en = 1'b0;
@@ -25,6 +27,8 @@ class uart_rx_monitor extends uvm_monitor;
 
         uaprx = new("uaprx", this);
         uap_rx_start = new("uap_rx_start", this);
+        uap_frame_error = new("uap_frame_error", this);
+
     endfunction
 
 
@@ -191,6 +195,8 @@ class uart_rx_monitor extends uvm_monitor;
 
             frame_valid = 1'b0;
 
+            uap_frame_error.write(req);
+
             `uvm_info(
                 "UART_RX_MONITOR",
                 "Invalid stop bit observed, dropping frame",
@@ -198,6 +204,7 @@ class uart_rx_monitor extends uvm_monitor;
             )
 
         end
+
         else begin
 
             frame_valid = 1'b1;
