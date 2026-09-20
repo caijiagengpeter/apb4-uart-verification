@@ -465,7 +465,8 @@ coverage_regression:
 	$(MAKE) coverage_rx_irq
 
 coverage_full_merge:
-	rm -rf urgReport_full_v3
+coverage_full_merge:
+	rm -rf urgReport_full_v4
 	urg \
 	-dir cov_8n1.vdb \
 	     cov_even.vdb \
@@ -478,7 +479,7 @@ coverage_full_merge:
 	     cov_rx_irq.vdb \
 	     cov_tx_parity_even.vdb \
 	     cov_apb_regs.vdb \
-	-report urgReport_full_v3
+	-report urgReport_full_v4
 
 	@echo "========================================"
 	@echo " Regression finished"

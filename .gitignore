@@ -17,6 +17,10 @@ verdi_config_file
 tr_db.log
 *.log
 *.vpd
+*.vdb/
+cov_*.vdb/
+urgReport*/
+*.fsm.sch.verilog.xml
 
 # Misc
 .DVEfiles/
