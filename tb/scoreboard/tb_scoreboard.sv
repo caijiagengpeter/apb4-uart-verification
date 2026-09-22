@@ -31,6 +31,9 @@ check_phase()
 `uvm_analysis_imp_decl(_uart_tx_start)
 `uvm_analysis_imp_decl(_uart_rx_start)
 
+// Corner case Reset
+virtual apb_if.RESET_MONITOR reset_vif;
+
 
 class tb_scoreboard extends uvm_scoreboard;
 
@@ -135,12 +138,35 @@ class tb_scoreboard extends uvm_scoreboard;
             require_stat_check
         ));
         // initial begin push one 0
+
+        if (!uvm_config_db#(virtual apb_if.RESET_MONITOR)::get(
+                this,
+                "",
+                "reset_vif",
+                reset_vif
+            )) begin
+
+            `uvm_fatal(
+                "TB_SCOREBOARD",
+                "Failed to get reset_vif"
+            )
+
+        end
+
     publish_fifo_state();
 
     endfunction
 
 
+    task run_phase(uvm_phase phase);
 
+        forever begin
+            @(negedge reset_vif.PRESETn);
+
+            reset_model();
+        end
+
+    endtask
 
     // ============================================================
     // APB transactions
@@ -612,6 +638,31 @@ class tb_scoreboard extends uvm_scoreboard;
         end
 
     endfunction
+
+    // Corner case test use!
+    task reset_model();
+
+        expected_tx_queue.delete();
+        expected_rx_queue.delete();
+
+        tx_fifo_count = 0;
+        rx_fifo_count = 0;
+
+        expected_tx_full = 1'b0;
+        expected_rx_empty = 1'b1;
+
+        expected_tx_busy = 1'b0;
+        expected_rx_busy = 1'b0;
+
+        `uvm_info(
+            "TB_SCOREBOARD",
+            "Reference model reset: queues, FIFO counts, and status expectations cleared",
+            UVM_LOW
+        )
+
+    endtask
+
+
 
 endclass
 

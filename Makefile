@@ -434,6 +434,35 @@ coverage_apb_regs:
 	+UVM_TESTNAME=apb_register_access_test \
 	| tee simv_apb_regs.log
 
+# conrer case compile
+compile_apb_unsupported:
+	$(VCS) $(VCS_FLAGS) \
+	$(RTL) \
+	$(ASSERT) \
+	$(TB) \
+	-o simv
+
+run_apb_unsupported:
+	$(MAKE) clean
+	$(MAKE) compile_apb_unsupported
+	./simv \
+	+UVM_TESTNAME=apb_unsupported_access_test \
+	| tee simv_apb_unsupported.log
+
+run_apb_reset:
+	$(MAKE) clean
+	$(MAKE) compile
+	./simv \
+	+UVM_TESTNAME=apb_reset_during_transfer_test \
+	| tee simv_apb_reset.log
+
+run_uart_tx_reset:
+	$(MAKE) clean
+	$(MAKE) compile
+	./simv \
+	+UVM_TESTNAME=uart_tx_reset_test \
+	| tee simv_uart_tx_reset.log
+
 # ============================================================
 # Full Functional Coverage Regression
 # ============================================================

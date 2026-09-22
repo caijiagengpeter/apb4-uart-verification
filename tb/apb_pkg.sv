@@ -34,6 +34,9 @@ package apb_pkg;
     `include "uart_tx_multi_sequence.sv"
     `include "uart_rx_multi_sequence.sv"
     `include "apb_register_access_sequence.sv"
+    `include "apb_unsupported_access_sequence.sv"
+    `include "apb_reset_during_transfer_sequence.sv"
+    `include "apb_post_reset_check_sequence.sv"
 
 // Coverage / Status
     `include "fifo_corner_item.sv"
@@ -66,6 +69,10 @@ package apb_pkg;
     `include "int_rx_full_test.sv"
     `include "uart_tx_parity_test.sv"
     `include "apb_register_access_test.sv"
+    `include "corner/apb_unsupported_access_test.sv"
+    `include "corner/apb_reset_during_transfer_test.sv"
+    `include "corner/uart_tx_reset_test.sv"
+
 
 
 

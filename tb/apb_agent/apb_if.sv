@@ -76,6 +76,18 @@ interface apb_if(input logic PCLK);
         clocking mon_cb
     );
 
+    modport RESET (
+        input  PCLK,
+        input  PSEL,
+        input  PENABLE,
+        output PRESETn
+    );
+
+    modport RESET_MONITOR (
+        input PCLK,
+        input PRESETn
+    );
+
 
 endinterface
 

@@ -214,6 +214,22 @@ module tb_top;
             status_if
         );
 
+        // Reset control for reset corner-case tests
+        uvm_config_db#(virtual apb_if.RESET)::set(
+            null,
+            "uvm_test_top",
+            "reset_vif",
+            apb_vif
+        );
+
+        // Reset for scoreboard
+        uvm_config_db#(virtual apb_if.RESET_MONITOR)::set(
+            null,
+            "uvm_test_top.env.scoreboard",
+            "reset_vif",
+            apb_vif
+        );
+
         // Test selected by +UVM_TESTNAME
         run_test();
 

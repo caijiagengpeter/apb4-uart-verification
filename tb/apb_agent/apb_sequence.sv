@@ -87,7 +87,39 @@ task apb_read(
 
 endtask
 
+    task apb_write_resp(
+        input  logic [7:0]  addr,
+        input  logic [31:0] data,
+        output logic        slverr,
+        input  logic [3:0]  strb = 4'b1111,
+        input  logic [2:0]  prot = 3'b000
+    );
 
+        apb_item req;
+
+        req = apb_item::type_id::create("req");
+
+        start_item(req);
+
+        assert(req.randomize() with {
+            req.addr  == local::addr;
+            req.write == 1'b1;
+            req.wdata == local::data;
+            req.strb  == local::strb;
+            req.prot  == local::prot;
+        })
+        else begin
+            `uvm_fatal(
+                "APB_SEQ",
+                "apb_write_resp randomization failed"
+            )
+        end
+
+        finish_item(req);
+
+        slverr = req.slverr;
+
+    endtask
 
     virtual task body();
         // base sequence 先不做具体操作
