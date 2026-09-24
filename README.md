@@ -25,8 +25,10 @@ The final merged Synopsys VCS/URG coverage results below show `uart_controller` 
 |---|---:|
 | Functional coverage | **100.00%** |
 | `uart_controller` line / condition / branch / toggle | **100.00% / 87.50% / 100.00% / 69.48%** |
+| `uart_controller` score | **89.24%** |
 | DUT subtree line / condition / toggle / FSM / branch | **99.21% / 83.67% / 80.72% / 77.78% / 88.37%** |
 | Assertion coverage | **89.19%** |
+| DUT subtree score | **86.49%** |
 
 ![Final coverage summary](docs/images/final_coverage_summary.png)
 
@@ -50,9 +52,40 @@ The original/ directory preserves the Vyges source package and Apache-2.0 licens
 
 APB register access and byte strobes; UART TX/RX; FIFO empty/middle/full; TX write while full; RX receive while full; RX read while empty; parity modes/errors; frame error; overrun; TX-empty IRQ; and RX-full IRQ are verified. See [verification plan](docs/verification_plan.md).
 
-## Coverage results
+## Verification Hardening Update
 
-The table and conclusion in this section retain the September 20, 2026 pre-hardening baseline. For the current v1.0 results, see [Final Coverage](#final-coverage).
+### Hardening Highlights
+
+- Unsupported TXDATA-read/RXDATA-write APB accesses return `PSLVERR` without corrupting valid RX data.
+- Reset recovery during APB SETUP/ACCESS, active TX, and an external RX frame is covered.
+- Full-duplex TX/RX overlap and simultaneous `TX_BUSY`/`RX_BUSY` are checked.
+- Global-enable TX gating retains queued data until `ctrl_enable` is asserted.
+- APB4 SVA/cover properties cover phase sequencing, stable controls, completion, strobes, errors, and the DUT-specific zero-wait response.
+
+### Hardening Regression
+
+| Test | Purpose | Result |
+|---|---|---:|
+| `apb_register_access_test` | APB register access | PASS |
+| `apb_unsupported_access_test` | Unsupported access direction | PASS |
+| `apb_reset_during_transfer_test` | APB runtime reset/recovery | PASS |
+| `uart_tx_reset_test` | TX reset recovery | PASS |
+| `uart_rx_reset_test` | RX reset recovery | PASS |
+| `uart_simultaneous_tx_rx_test` | Full-duplex overlap | PASS |
+| `uart_global_disable_tx_test` | Global-enable TX gating | PASS |
+
+Verified local Synopsys VCS/URG result: 7/7 PASS; `UVM_WARNING=0`, `UVM_ERROR=0`, `UVM_FATAL=0`.
+
+### Final Coverage
+
+The [Final Verification Results](#final-verification-results) above contain the final coverage table and merged URG screenshot. Supplemental [APB SVA coverage evidence](docs/coverage_summary.md#apb-sva--assertion-coverage-evidence) is provided in the coverage summary.
+
+The global URG total is not the primary project metric because UVM/Verdi instrumentation lowers it. Remaining holes are reviewed: zero-wait APB has no wait-state hit, the word-aligned map keeps `PADDR[1:0]` static, `PPROT` is unused, and residual protocol/topology and assertion failure branches are low verification-value combinations.
+
+## Historical Pre-Hardening Coverage Baseline
+
+> Historical baseline from September 20, 2026.
+> The current v1.0 results are shown in [Final Verification Results](#final-verification-results) above.
 
 Whole-simulation URG totals include UVM/Verdi recording instrumentation, so portfolio interpretation uses DUT scope.
 
@@ -63,7 +96,7 @@ Whole-simulation URG totals include UVM/Verdi recording instrumentation, so port
 | DUT subtree line / branch / condition / toggle / FSM | **99.15% / 92.86% / 82.65% / 77.81% / 66.67%** |
 | uart_controller line / branch / condition / toggle | **100.00% / 100.00% / 83.93% / 66.57%** |
 
-Functional and assertion coverage are complete; condition, toggle, and DUT-subtree FSM coverage retain reviewed gaps. See [coverage summary](docs/coverage_summary.md).
+At this pre-hardening baseline, functional and assertion coverage reached 100%. Condition, toggle, and DUT-subtree FSM coverage retained reviewed gaps. See [coverage summary](docs/coverage_summary.md).
 
 ## Known RTL design gaps
 
@@ -103,38 +136,12 @@ Makefile   Compilation, tests, coverage regression, merge, and Verdi flow
 
 ## Future work
 
-Specify runtime parity, PPROT, reserved-register, and unaligned-address intent; add unsupported-access and global-enable robustness tests; and add CI where licensed tools are available.
+- Add protocol-stress scenarios such as APB back-to-back transfers.
+- Extend runtime parity configurability if the DUT RTL is enhanced to support it.
+- Add PPROT-aware behavior if protection attributes are implemented in the DUT.
+- Add CI/regression automation where licensed Synopsys tools are available.
+- Extend coverage exclusions/waivers for reviewed design-inapplicable coverage holes.
 
 ## Attribution
 
 DUT-origin material and license notices are preserved under original/. The UVM verification environment and project documentation are maintained in this repository.
-
-## Verification Hardening Update
-
-### Hardening Highlights
-
-- Unsupported TXDATA-read/RXDATA-write APB accesses return `PSLVERR` without corrupting valid RX data.
-- Reset recovery during APB SETUP/ACCESS, active TX, and an external RX frame is covered.
-- Full-duplex TX/RX overlap and simultaneous `TX_BUSY`/`RX_BUSY` are checked.
-- Global-enable TX gating retains queued data until `ctrl_enable` is asserted.
-- APB4 SVA/cover properties cover phase sequencing, stable controls, completion, strobes, errors, and the DUT-specific zero-wait response.
-
-### Hardening Regression
-
-| Test | Purpose | Result |
-|---|---|---:|
-| `apb_register_access_test` | APB register access | PASS |
-| `apb_unsupported_access_test` | Unsupported access direction | PASS |
-| `apb_reset_during_transfer_test` | APB runtime reset/recovery | PASS |
-| `uart_tx_reset_test` | TX reset recovery | PASS |
-| `uart_rx_reset_test` | RX reset recovery | PASS |
-| `uart_simultaneous_tx_rx_test` | Full-duplex overlap | PASS |
-| `uart_global_disable_tx_test` | Global-enable TX gating | PASS |
-
-Verified local Synopsys VCS/URG result: 7/7 PASS; `UVM_WARNING=0`, `UVM_ERROR=0`, `UVM_FATAL=0`.
-
-### Final Coverage
-
-The [Final Verification Results](#final-verification-results) above contain the final coverage table and merged URG screenshot. Supplemental [APB SVA coverage evidence](docs/coverage_summary.md#apb-sva--assertion-coverage-evidence) is provided in the coverage summary.
-
-The global URG total is not the primary project metric because UVM/Verdi instrumentation lowers it. Remaining holes are reviewed: zero-wait APB has no wait-state hit, the word-aligned map keeps `PADDR[1:0]` static, `PPROT` is unused, and residual protocol/topology and assertion failure branches are low verification-value combinations.
