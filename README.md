@@ -2,7 +2,33 @@
 
 A SystemVerilog/UVM verification project for an APB4 UART controller with FIFO, error-status, and interrupt behavior.
 
-![Final merged coverage summary](docs/images/final_coverage_summary.png)
+## Project Summary
+
+- APB4-based UART IP verification; v1.0 hardening and coverage closure completed.
+- SystemVerilog / UVM / SVA / Functional Coverage; Synopsys VCS + Verdi.
+- Hardening regression: **7 / 7 PASS**, with zero UVM warnings, errors, or fatals.
+- Functional coverage: **100.00%**.
+- `uart_controller` line / branch coverage: **100.00% / 100.00%**.
+- DUT subtree line / assertion coverage: **99.21% / 89.19%**.
+
+See the [verification plan](docs/verification_plan.md) for scope and the [v1.0 coverage summary](docs/coverage_summary.md#v10-hardening-final-results) for reviewed residual gaps. These results do not imply 100% code coverage or exhaustive verification.
+
+## Final Verification Results
+
+The final hardening regression completed with **7/7 tests passing** and **zero UVM warnings, errors, or fatals**. The [hardening regression table](#hardening-regression) lists the tests.
+
+![Final regression summary](docs/images/final_regression_summary.png)
+
+The final merged Synopsys VCS/URG coverage results below show `uart_controller` and its DUT subtree. The global URG score is not the primary result because it includes UVM/Verdi instrumentation.
+
+| Metric | Result |
+|---|---:|
+| Functional coverage | **100.00%** |
+| `uart_controller` line / condition / branch / toggle | **100.00% / 87.50% / 100.00% / 69.48%** |
+| DUT subtree line / condition / toggle / FSM / branch | **99.21% / 83.67% / 80.72% / 77.78% / 88.37%** |
+| Assertion coverage | **89.19%** |
+
+![Final coverage summary](docs/images/final_coverage_summary.png)
 
 ## Project overview
 
@@ -25,6 +51,8 @@ The original/ directory preserves the Vyges source package and Apache-2.0 licens
 APB register access and byte strobes; UART TX/RX; FIFO empty/middle/full; TX write while full; RX receive while full; RX read while empty; parity modes/errors; frame error; overrun; TX-empty IRQ; and RX-full IRQ are verified. See [verification plan](docs/verification_plan.md).
 
 ## Coverage results
+
+The table and conclusion in this section retain the September 20, 2026 pre-hardening baseline. For the current v1.0 results, see [Final Coverage](#final-coverage).
 
 Whole-simulation URG totals include UVM/Verdi recording instrumentation, so portfolio interpretation uses DUT scope.
 
@@ -107,11 +135,6 @@ Verified local Synopsys VCS/URG result: 7/7 PASS; `UVM_WARNING=0`, `UVM_ERROR=0`
 
 ### Final Coverage
 
-| Metric | Result |
-|---|---:|
-| Functional coverage | **100.00%** |
-| `uart_controller` line / condition / branch / toggle | **100.00% / 87.50% / 100.00% / 69.48%** |
-| DUT subtree line / condition / toggle / FSM / branch | **99.21% / 83.67% / 80.72% / 77.78% / 88.37%** |
-| Assertion coverage | **89.19%** |
+The [Final Verification Results](#final-verification-results) above contain the final coverage table and merged URG screenshot. Supplemental [APB SVA coverage evidence](docs/coverage_summary.md#apb-sva--assertion-coverage-evidence) is provided in the coverage summary.
 
 The global URG total is not the primary project metric because UVM/Verdi instrumentation lowers it. Remaining holes are reviewed: zero-wait APB has no wait-state hit, the word-aligned map keeps `PADDR[1:0]` static, `PPROT` is unused, and residual protocol/topology and assertion failure branches are low verification-value combinations.

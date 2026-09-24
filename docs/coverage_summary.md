@@ -59,3 +59,9 @@ Results documented from the verified local Synopsys VCS/URG regression on Septem
 | Assertions | Assertion coverage | **89.19%** |
 
 The global URG score is not reported as the primary result because it includes UVM/Verdi instrumentation. Residual holes were reviewed as design-inapplicable, protocol/topology artifacts, parameter/alignment-driven, or low verification-value combinations: zero-wait APB has no wait-state hit, `PADDR[1:0]` is static for word-aligned registers, `PPROT` is unused, and assertion failure action branches should not execute in a passing regression.
+
+### APB SVA / Assertion Coverage Evidence
+
+The screenshot below records APB SVA runtime cover-hit counters for the hardening runs, including SETUP/ACCESS sequencing, completed transfers, and PSTRB writes. It is supplemental execution evidence, not a final merged coverage percentage; zero wait-state hits are expected for the zero-wait UART APB slave. The final merged DUT-subtree assertion coverage remains **89.19%**, as reported above. The [final VCS/URG coverage screenshot](images/final_coverage_summary.png) remains the main coverage evidence.
+
+![APB SVA coverage summary](images/apb_sva_coverage_summary.png)

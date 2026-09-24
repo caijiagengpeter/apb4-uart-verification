@@ -1,12 +1,14 @@
 # VCS build outputs
 csrc/
 simv
+simv*
 simv.daidir/
 ucli.key
 vc_hdrs.h
 
 # Verdi / FSDB outputs
 wave.fsdb
+*.fsdb
 verdiLog/
 novas.conf
 novas.rc
@@ -18,6 +20,7 @@ tr_db.log
 *.log
 *.vpd
 *.vdb/
+*.vdb
 cov_*.vdb/
 urgReport*/
 *.fsm.sch.verilog.xml
