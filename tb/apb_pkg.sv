@@ -37,6 +37,10 @@ package apb_pkg;
     `include "apb_unsupported_access_sequence.sv"
     `include "apb_reset_during_transfer_sequence.sv"
     `include "apb_post_reset_check_sequence.sv"
+    `include "apb_tx_rx_enable.sv"
+    `include "apb_check_tx_rx_busy.sv"
+    `include "apb_ctrl_write_sequence.sv"
+    `include "apb_check_tx_busy_sequence.sv"
 
 // Coverage / Status
     `include "fifo_corner_item.sv"
@@ -72,7 +76,9 @@ package apb_pkg;
     `include "corner/apb_unsupported_access_test.sv"
     `include "corner/apb_reset_during_transfer_test.sv"
     `include "corner/uart_tx_reset_test.sv"
-
+    `include "corner/uart_rx_reset_test.sv"
+    `include "corner/uart_simultaneous_tx_rx_test.sv"
+    `include "corner/uart_global_disable_tx_test.sv"
 
 
 

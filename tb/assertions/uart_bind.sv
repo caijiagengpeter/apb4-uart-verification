@@ -30,15 +30,21 @@ bind uart_controller uart_assertions uart_assertions_inst (
     .int_rx_full_en     (int_rx_full_en),
     .irq_rx_full_o      (irq_rx_full_o),
 
-    // APB interface (RX fifo Boundary)
-    .psel_i(psel_i),
-    .penable_i(penable_i),
-    .pwrite_i(pwrite_i),
-    .paddr_i(paddr_i),
+    // APB interface (RX fifo Boundary + APB4 protocol assertions)
+    .psel_i     (psel_i),
+    .penable_i  (penable_i),
+    .pwrite_i   (pwrite_i),
+    .paddr_i    (paddr_i),
+
+    .pwdata_i   (pwdata_i),
+    .pstrb_i    (pstrb_i),
+    .pprot_i    (pprot_i),
+
+    .pready_o   (pready_o),
+    .pslverr_o  (pslverr_o),
 
     .rx_fifo_empty(rx_fifo_empty),
     .rx_fifo_rd_en(rx_fifo_rd_en)
-
 );
 
 `endif

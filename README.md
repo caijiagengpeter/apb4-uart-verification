@@ -51,8 +51,9 @@ make run_test TEST=uart_rx_test
 make frame_error
 make tx_empty_irq
 make rx_full_irq
-make coverage_regression
-make coverage_full_merge
+make regression
+make final_coverage
+make final_merge
 make verdi
 ~~~
 
@@ -79,3 +80,38 @@ Specify runtime parity, PPROT, reserved-register, and unaligned-address intent; 
 ## Attribution
 
 DUT-origin material and license notices are preserved under original/. The UVM verification environment and project documentation are maintained in this repository.
+
+## Verification Hardening Update
+
+### Hardening Highlights
+
+- Unsupported TXDATA-read/RXDATA-write APB accesses return `PSLVERR` without corrupting valid RX data.
+- Reset recovery during APB SETUP/ACCESS, active TX, and an external RX frame is covered.
+- Full-duplex TX/RX overlap and simultaneous `TX_BUSY`/`RX_BUSY` are checked.
+- Global-enable TX gating retains queued data until `ctrl_enable` is asserted.
+- APB4 SVA/cover properties cover phase sequencing, stable controls, completion, strobes, errors, and the DUT-specific zero-wait response.
+
+### Hardening Regression
+
+| Test | Purpose | Result |
+|---|---|---:|
+| `apb_register_access_test` | APB register access | PASS |
+| `apb_unsupported_access_test` | Unsupported access direction | PASS |
+| `apb_reset_during_transfer_test` | APB runtime reset/recovery | PASS |
+| `uart_tx_reset_test` | TX reset recovery | PASS |
+| `uart_rx_reset_test` | RX reset recovery | PASS |
+| `uart_simultaneous_tx_rx_test` | Full-duplex overlap | PASS |
+| `uart_global_disable_tx_test` | Global-enable TX gating | PASS |
+
+Verified local Synopsys VCS/URG result: 7/7 PASS; `UVM_WARNING=0`, `UVM_ERROR=0`, `UVM_FATAL=0`.
+
+### Final Coverage
+
+| Metric | Result |
+|---|---:|
+| Functional coverage | **100.00%** |
+| `uart_controller` line / condition / branch / toggle | **100.00% / 87.50% / 100.00% / 69.48%** |
+| DUT subtree line / condition / toggle / FSM / branch | **99.21% / 83.67% / 80.72% / 77.78% / 88.37%** |
+| Assertion coverage | **89.19%** |
+
+The global URG total is not the primary project metric because UVM/Verdi instrumentation lowers it. Remaining holes are reviewed: zero-wait APB has no wait-state hit, the word-aligned map keeps `PADDR[1:0]` static, `PPROT` is unused, and residual protocol/topology and assertion failure branches are low verification-value combinations.

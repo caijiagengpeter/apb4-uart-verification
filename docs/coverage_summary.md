@@ -45,4 +45,17 @@ The controller has no standalone FSM metric in this report. Functional and asser
 
 ## Coverage Closure Conclusion
 
-The regression achieves 100% functional and assertion coverage and complete controller line and branch coverage. The remaining 83.93% controller condition coverage, 66.57% controller toggle coverage, and 66.67% DUT-subtree FSM coverage are explicitly reviewed rather than obscured. No DUT RTL was modified solely to improve coverage metrics. Coverage improvements were achieved through additional directed verification scenarios, while remaining holes were reviewed for exclusion, waiver, or design-gap classification.
+Earlier report values above are retained as historical context; the authoritative current hardening results and reviewed residual holes are recorded in the v1.0 section below.
+
+## v1.0 Hardening Final Results
+
+Results documented from the verified local Synopsys VCS/URG regression on September 24, 2026.
+
+| Scope | Metric | Result |
+|---|---|---:|
+| Verification model | Functional coverage | **100.00%** |
+| `uart_controller` | Line / condition / branch / toggle | **100.00% / 87.50% / 100.00% / 69.48%** |
+| DUT subtree | Line / condition / toggle / FSM / branch | **99.21% / 83.67% / 80.72% / 77.78% / 88.37%** |
+| Assertions | Assertion coverage | **89.19%** |
+
+The global URG score is not reported as the primary result because it includes UVM/Verdi instrumentation. Residual holes were reviewed as design-inapplicable, protocol/topology artifacts, parameter/alignment-driven, or low verification-value combinations: zero-wait APB has no wait-state hit, `PADDR[1:0]` is static for word-aligned registers, `PPROT` is unused, and assertion failure action branches should not execute in a passing regression.

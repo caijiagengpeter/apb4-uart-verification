@@ -3,8 +3,8 @@
 
 class uart_rx_monitor extends uvm_monitor;
 
-    localparam int CLKS_PER_BIT       = 50_000_000 / 115_200; // 434
-    localparam int HALF_CLKS_PER_BIT  = CLKS_PER_BIT / 2;     // 217
+    localparam int CLKS_PER_BIT      = 50_000_000 / 115_200;
+    localparam int HALF_CLKS_PER_BIT = CLKS_PER_BIT / 2;
 
     `uvm_component_utils(uart_rx_monitor)
 
@@ -12,12 +12,11 @@ class uart_rx_monitor extends uvm_monitor;
 
     uvm_analysis_port #(uart_item) uaprx;
     uvm_analysis_port #(uart_item) uap_rx_start;
-    // For Coverage test only (give the frame error item to coverage/ normal will drop, but this kept)
     uvm_analysis_port #(uart_item) uap_frame_error;
 
-    // Monitor configuration
-    bit parity_en = 1'b0;
+    bit parity_en  = 1'b0;
     bit parity_odd = 1'b0;
+
 
     function new(
         string name = "uart_rx_monitor",
@@ -25,10 +24,9 @@ class uart_rx_monitor extends uvm_monitor;
     );
         super.new(name, parent);
 
-        uaprx = new("uaprx", this);
-        uap_rx_start = new("uap_rx_start", this);
+        uaprx           = new("uaprx", this);
+        uap_rx_start    = new("uap_rx_start", this);
         uap_frame_error = new("uap_frame_error", this);
-
     endfunction
 
 
@@ -37,10 +35,7 @@ class uart_rx_monitor extends uvm_monitor;
         super.build_phase(phase);
 
         if (!uvm_config_db#(virtual uart_if.MONITOR)::get(
-                this,
-                "",
-                "vif",
-                vif
+                this, "", "vif", vif
             )) begin
 
             `uvm_fatal(
@@ -49,38 +44,54 @@ class uart_rx_monitor extends uvm_monitor;
             )
 
         end
-        // Default remains parity disabled.
-        // Parity-enabled tests can override this through config_db.
 
         if (!uvm_config_db#(bit)::get(
-                this,
-                "",
-                "parity_en",
-                parity_en
-            )) begin
-
+                this, "", "parity_en", parity_en
+            ))
             parity_en = 1'b0;
 
-        end
-
         if (!uvm_config_db#(bit)::get(
-                this,
-                "",
-                "parity_odd",
-                parity_odd
-            )) begin
-
+                this, "", "parity_odd", parity_odd
+            ))
             parity_odd = 1'b0;
-
-        end
 
     endfunction
 
 
+    // ============================================================
+    // Wait clocks, but abort if reset happens
+    // ============================================================
+
+    task wait_clks_or_reset(
+        input  int num_clks,
+        output bit success
+    );
+
+        success = 1'b1;
+
+        for (int i = 0; i < num_clks; i++) begin
+
+            @(posedge vif.clk);
+
+            if (vif.rst_n !== 1'b1) begin
+                success = 1'b0;
+                return;
+            end
+
+        end
+
+    endtask
+
+
+    // ============================================================
+    // Main monitor
+    // ============================================================
+
     virtual task run_phase(uvm_phase phase);
 
         uart_item req;
-        bit frame_valid;
+        bit       sample_ok;
+        bit       frame_valid;
 
         forever begin
 
@@ -88,24 +99,102 @@ class uart_rx_monitor extends uvm_monitor;
 
             req = uart_item::type_id::create("req");
 
-            wait_start_bit();
+            // ----------------------------------------------------
+            // 1. Start bit
+            // ----------------------------------------------------
 
-            // RX transaction has started
-            req.parity_en = parity_en;
-            req.parity_odd = parity_odd;
-            uap_rx_start.write(req);
+            wait_start_bit(sample_ok);
 
-            // Sample 8 data bits
-            sample_data_bits(req);
+            if (!sample_ok) begin
 
-            // If parity mode is enabled, consume one parity bit
-            // before checking the stop bit.
-            if (parity_en) begin
-                sample_parity_bit(req);
+                `uvm_info(
+                    "UART_RX_MONITOR",
+                    "Reset detected while waiting for RX start bit",
+                    UVM_MEDIUM
+                )
+
+                continue;
+
             end
 
-            // Sample and validate stop bit
-            sample_stop_bit(req, frame_valid);
+
+            req.parity_en  = parity_en;
+            req.parity_odd = parity_odd;
+
+            // Receiver has started observing a UART frame.
+            uap_rx_start.write(req);
+
+
+            // ----------------------------------------------------
+            // 2. Data bits
+            // ----------------------------------------------------
+
+            sample_data_bits(
+                req,
+                sample_ok
+            );
+
+            if (!sample_ok) begin
+
+                `uvm_info(
+                    "UART_RX_MONITOR",
+                    "UART RX frame aborted by reset during data bits",
+                    UVM_LOW
+                )
+
+                continue;
+
+            end
+
+
+            // ----------------------------------------------------
+            // 3. Optional parity
+            // ----------------------------------------------------
+
+            if (parity_en) begin
+
+                sample_parity_bit(
+                    req,
+                    sample_ok
+                );
+
+                if (!sample_ok) begin
+
+                    `uvm_info(
+                        "UART_RX_MONITOR",
+                        "UART RX frame aborted by reset during parity bit",
+                        UVM_LOW
+                    )
+
+                    continue;
+
+                end
+
+            end
+
+
+            // ----------------------------------------------------
+            // 4. Stop bit
+            // ----------------------------------------------------
+
+            sample_stop_bit(
+                req,
+                frame_valid,
+                sample_ok
+            );
+
+            if (!sample_ok) begin
+
+                `uvm_info(
+                    "UART_RX_MONITOR",
+                    "UART RX frame aborted by reset during stop bit",
+                    UVM_LOW
+                )
+
+                continue;
+
+            end
+
 
             if (frame_valid) begin
 
@@ -127,18 +216,57 @@ class uart_rx_monitor extends uvm_monitor;
     endtask
 
 
-    task wait_start_bit();
+    // ============================================================
+    // Start bit
+    // ============================================================
+
+    task wait_start_bit(
+        output bit success
+    );
+
+        bit timing_ok;
+
+        success = 1'b0;
 
         forever begin
 
-            @(negedge vif.rx);
+            if (vif.rst_n !== 1'b1)
+                return;
 
-            repeat (HALF_CLKS_PER_BIT)
-                @(posedge vif.clk);
+
+            fork : WAIT_RX_START_OR_RESET
+
+                begin
+                    @(negedge vif.rx);
+                end
+
+                begin
+                    @(negedge vif.rst_n);
+                end
+
+            join_any
+
+            disable WAIT_RX_START_OR_RESET;
+
+
+            if (vif.rst_n !== 1'b1)
+                return;
+
+
+            wait_clks_or_reset(
+                HALF_CLKS_PER_BIT,
+                timing_ok
+            );
+
+            if (!timing_ok)
+                return;
+
 
             if (vif.rx === 1'b0) begin
+                success = 1'b1;
                 return;
             end
+
 
             `uvm_warning(
                 "UART_RX_MONITOR",
@@ -150,12 +278,30 @@ class uart_rx_monitor extends uvm_monitor;
     endtask
 
 
-    task sample_data_bits(uart_item req);
+    // ============================================================
+    // Data bits
+    // ============================================================
+
+    task sample_data_bits(
+        uart_item req,
+        output bit success
+    );
+
+        bit timing_ok;
+
+        success = 1'b1;
 
         for (int i = 0; i < 8; i++) begin
 
-            repeat (CLKS_PER_BIT)
-                @(posedge vif.clk);
+            wait_clks_or_reset(
+                CLKS_PER_BIT,
+                timing_ok
+            );
+
+            if (!timing_ok) begin
+                success = 1'b0;
+                return;
+            end
 
             req.data[i] = vif.rx;
 
@@ -164,10 +310,28 @@ class uart_rx_monitor extends uvm_monitor;
     endtask
 
 
-    task sample_parity_bit(uart_item req);
+    // ============================================================
+    // Parity
+    // ============================================================
 
-        repeat (CLKS_PER_BIT)
-            @(posedge vif.clk);
+    task sample_parity_bit(
+        uart_item req,
+        output bit success
+    );
+
+        bit timing_ok;
+
+        success = 1'b1;
+
+        wait_clks_or_reset(
+            CLKS_PER_BIT,
+            timing_ok
+        );
+
+        if (!timing_ok) begin
+            success = 1'b0;
+            return;
+        end
 
         req.parity_bit = vif.rx;
 
@@ -183,13 +347,32 @@ class uart_rx_monitor extends uvm_monitor;
     endtask
 
 
+    // ============================================================
+    // Stop bit
+    // ============================================================
+
     task sample_stop_bit(
         uart_item req,
-        output bit frame_valid
+        output bit frame_valid,
+        output bit success
     );
 
-        repeat (CLKS_PER_BIT)
-            @(posedge vif.clk);
+        bit timing_ok;
+
+        success     = 1'b1;
+        frame_valid = 1'b0;
+
+
+        wait_clks_or_reset(
+            CLKS_PER_BIT,
+            timing_ok
+        );
+
+        if (!timing_ok) begin
+            success = 1'b0;
+            return;
+        end
+
 
         if (vif.rx !== 1'b1) begin
 
@@ -204,7 +387,6 @@ class uart_rx_monitor extends uvm_monitor;
             )
 
         end
-
         else begin
 
             frame_valid = 1'b1;

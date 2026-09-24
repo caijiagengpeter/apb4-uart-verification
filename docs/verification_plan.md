@@ -50,7 +50,7 @@ The APB agent drives compliant SETUP/ACCESS transfers and monitors bus activity.
 
 ## 4. Coverage Closure Strategy
 
-Defined functional coverage goals are currently 100%, and assertion coverage is currently 100%. Remaining code-coverage holes are reviewed individually. Protocol-unreachable, reserved, constant, unused, specification-dependent, and RTL-design-gap cases are documented rather than artificially forced. Detailed analysis is in [coverage_summary.md](coverage_summary.md).
+Defined functional coverage goals are 100%. The hardening regression completes the directed reset, unsupported-access, full-duplex, global-enable gating, APB4 SVA, regression, and coverage-closure items; residual holes are reviewed in the coverage summary.
 
 ## 5. Known Design Gaps / Limitations
 
@@ -68,4 +68,17 @@ Defined functional coverage goals are currently 100%, and assertion coverage is 
 - Code-coverage holes are reviewed and classified in the coverage summary.
 - No DUT modification is made solely for coverage improvement.
 
-Run make coverage_regression followed by make coverage_full_merge to reproduce the directed coverage flow and merged URG report.
+Run make regression for the hardening suite, or make final_coverage followed by make final_merge for the final directed coverage flow.
+
+## v1.0 Hardening Completion
+
+| Hardening item | Evidence | Status |
+|---|---|---|
+| Runtime reset (APB/TX/RX) | Reset-during-transfer and TX/RX reset tests | Completed |
+| Unsupported access | TXDATA read / RXDATA write `PSLVERR` and RX-data preservation | Completed |
+| Simultaneous TX/RX | Full-duplex busy and data checks | Completed |
+| Global-enable TX gating | Queued-data retention and post-enable transmit | Completed |
+| APB4 SVA | Phase, stability, completion, PSTRB, zero-wait assertions/covers | Completed |
+| Regression and coverage closure | 7-test hardening regression; reviewed residual holes | Completed |
+
+Run `make regression` for hardening, and `make final_coverage` then `make final_merge` for the full directed coverage flow.

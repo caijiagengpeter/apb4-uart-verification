@@ -35,16 +35,34 @@ module uart_assertions (
     input logic int_rx_full_en,
     input logic irq_rx_full_o,
 
-    // APB signals
+/*s    // APB signals
     input logic       psel_i,
     input logic       penable_i,
     input logic       pwrite_i,
     input logic [7:0] paddr_i,
-
+*/
     // RX FIFO empty-read check
     input logic rx_fifo_empty,
-    input logic rx_fifo_rd_en
+    input logic rx_fifo_rd_en,
 
+    // ------------------------------------------------------------
+    // APB
+    // ------------------------------------------------------------
+    //input logic        pclk_i,
+    //input logic        presetn_i,
+
+    input logic        psel_i,
+    input logic        penable_i,
+    input logic        pwrite_i,
+
+    input logic [7:0]  paddr_i,
+    input logic [31:0] pwdata_i,
+
+    input logic [3:0]  pstrb_i,
+    input logic [2:0]  pprot_i,
+
+    input logic        pready_o,
+    input logic        pslverr_o
 
 );
 
@@ -69,6 +87,9 @@ module uart_assertions (
     int unsigned rx_full_irq_high_hit_count = 0;
     int unsigned rx_full_irq_low_hit_count  = 0;
     int unsigned rx_full_irq_fail_count     = 0;
+
+    // APB protocol assertion failures
+    int unsigned apb_protocol_fail_count = 0;
 
     // ============================================================
     // RX overrun assertions
@@ -431,7 +452,706 @@ module uart_assertions (
                 )
             end
 
+    // ============================================================
+    // APB4 PROTOCOL ASSERTIONS
+    // ============================================================
+    //
+    // These assertions check APB protocol sequencing and signaling.
+    //
+    // Note:
+    //   p_apb_zero_wait_response is DUT-specific.
+    //   APB4 itself allows wait states, but this UART slave is
+    //   implemented as a zero-wait-state APB slave.
+    // ============================================================
+
+
+    // ============================================================
+    // 1. SETUP must be followed by ACCESS
+    //
+    // SETUP:
+    //   PSEL    = 1
+    //   PENABLE = 0
+    //
+    // Next cycle:
+    //
+    // ACCESS:
+    //   PSEL    = 1
+    //   PENABLE = 1
+    // ============================================================
+
+    property p_apb_setup_to_access;
+
+        @(posedge pclk_i)
+        disable iff (!presetn_i)
+
+        (psel_i && !penable_i)
+        |=>
+        (psel_i && penable_i);
+
+    endproperty
+
+
+    a_apb_setup_to_access:
+    assert property (p_apb_setup_to_access)
+    else begin
+
+        apb_protocol_fail_count++;
+
+        `uvm_error(
+            "SVA_APB_SETUP_ACCESS",
+            $sformatf(
+                "APB protocol violation: SETUP phase was not followed by ACCESS phase, fail_count=%0d",
+                apb_protocol_fail_count
+            )
+        )
+
+    end
+
+
+    // ============================================================
+    // 2. First ACCESS cycle must have a previous SETUP cycle
+    //
+    // We only check the first ACCESS cycle.
+    //
+    // In a wait-state transfer PENABLE may remain high for several
+    // cycles, so later ACCESS cycles do not require a new SETUP.
+    // ============================================================
+
+    property p_apb_access_has_setup;
+
+        @(posedge pclk_i)
+        disable iff (!presetn_i)
+
+        (
+            psel_i &&
+            penable_i &&
+            !$past(penable_i)
+        )
+        |->
+        $past(psel_i && !penable_i);
+
+    endproperty
+
+
+    a_apb_access_has_setup:
+    assert property (p_apb_access_has_setup)
+    else begin
+
+        apb_protocol_fail_count++;
+
+        `uvm_error(
+            "SVA_APB_ACCESS_SETUP",
+            $sformatf(
+                "APB protocol violation: ACCESS phase entered without previous SETUP phase, fail_count=%0d",
+                apb_protocol_fail_count
+            )
+        )
+
+    end
+
+
+    // ============================================================
+    // 3. Address/control/data must remain stable during wait state
+    //
+    // ACCESS + PREADY=0 means the slave extends the transfer.
+    //
+    // The master must hold:
+    //   PADDR
+    //   PWRITE
+    //   PWDATA
+    //   PSTRB
+    //   PPROT
+    //
+    // stable until the transfer progresses.
+    //
+    // Current DUT is zero-wait, so this antecedent is normally
+    // unreachable in the present UART implementation.
+    // ============================================================
+
+    property p_apb_stable_during_wait;
+
+        @(posedge pclk_i)
+        disable iff (!presetn_i)
+
+        (
+            psel_i &&
+            penable_i &&
+            !pready_o
+        )
+        |=>
+        (
+            psel_i &&
+            penable_i &&
+
+            $stable({
+                paddr_i,
+                pwrite_i,
+                pwdata_i,
+                pstrb_i,
+                pprot_i
+            })
+        );
+
+    endproperty
+
+
+    a_apb_stable_during_wait:
+    assert property (p_apb_stable_during_wait)
+    else begin
+
+        apb_protocol_fail_count++;
+
+        `uvm_error(
+            "SVA_APB_WAIT_STABLE",
+            $sformatf(
+                "APB protocol violation: address/control/data changed during wait state, fail_count=%0d",
+                apb_protocol_fail_count
+            )
+        )
+
+    end
+
+
+    // ============================================================
+    // 4. Completed ACCESS must exit ACCESS next cycle
+    //
+    // Transfer completion:
+    //   PSEL    = 1
+    //   PENABLE = 1
+    //   PREADY  = 1
+    //
+    // Next cycle must be either:
+    //
+    //   IDLE
+    //
+    // or:
+    //
+    //   SETUP for next transfer
+    //
+    // Therefore PENABLE must be LOW next cycle.
+    // PSEL is allowed to remain HIGH for back-to-back transfers.
+    // ============================================================
+
+    property p_apb_complete_exits_access;
+
+        @(posedge pclk_i)
+        disable iff (!presetn_i)
+
+        (
+            psel_i &&
+            penable_i &&
+            pready_o
+        )
+        |=>
+        (!penable_i);
+
+    endproperty
+
+
+    a_apb_complete_exits_access:
+    assert property (p_apb_complete_exits_access)
+    else begin
+
+        apb_protocol_fail_count++;
+
+        `uvm_error(
+            "SVA_APB_COMPLETE_EXIT",
+            $sformatf(
+                "APB protocol violation: PENABLE remained asserted after transfer completion, fail_count=%0d",
+                apb_protocol_fail_count
+            )
+        )
+
+    end
+
+
+    // ============================================================
+    // 5. PSTRB must be inactive during APB reads
+    //
+    // APB4 PSTRB is meaningful for write transfers.
+    //
+    // Read:
+    //   PWRITE = 0
+    //
+    // Expected:
+    //   PSTRB = 0000
+    // ============================================================
+
+    property p_apb_read_pstrb_zero;
+
+        @(posedge pclk_i)
+        disable iff (!presetn_i)
+
+        (
+            psel_i &&
+            !pwrite_i
+        )
+        |->
+        (pstrb_i == 4'b0000);
+
+    endproperty
+
+
+    a_apb_read_pstrb_zero:
+    assert property (p_apb_read_pstrb_zero)
+    else begin
+
+        apb_protocol_fail_count++;
+
+        `uvm_error(
+            "SVA_APB_READ_PSTRB",
+            $sformatf(
+                "APB4 protocol violation: PSTRB active during read transfer, PSTRB=0x%0h fail_count=%0d",
+                pstrb_i,
+                apb_protocol_fail_count
+            )
+        )
+
+    end
+
+    // ============================================================
+    // 7. DUT-specific zero-wait response
+    //
+    // IMPORTANT:
+    //   This is NOT a general APB4 requirement.
+    //
+    // APB4 permits:
+    //
+    //   PREADY = 0
+    //
+    // to insert wait states.
+    //
+    // This UART DUT is specifically implemented as zero-wait:
+    //
+    //   ACCESS -> PREADY = 1
+    //
+    // Therefore every ACCESS cycle should immediately see PREADY.
+    // ============================================================
+
+    property p_apb_zero_wait_response;
+
+        @(posedge pclk_i)
+        disable iff (!presetn_i)
+
+        (
+            psel_i &&
+            penable_i
+        )
+        |->
+        pready_o;
+
+    endproperty
+
+
+    a_apb_zero_wait_response:
+    assert property (p_apb_zero_wait_response)
+    else begin
+
+        apb_protocol_fail_count++;
+
+        `uvm_error(
+            "SVA_APB_ZERO_WAIT",
+            $sformatf(
+                "APB DUT violation: zero-wait slave did not assert PREADY during ACCESS, fail_count=%0d",
+                apb_protocol_fail_count
+            )
+        )
+
+    end
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Cover part
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////Cover
+        // ============================================================================
+        // APB4 PROTOCOL COVERAGE
+        //
+        // Purpose:
+        //   Assertions answer: "Did the protocol ever violate a rule?"
+        //   Cover properties answer: "Did this scenario actually occur?"
+        //
+        // NOTE:
+        //   This UART implements a zero-wait APB slave:
+        //       ACCESS -> PREADY = 1
+        //
+        //   Therefore:
+        //       apb_wait_state_hits == 0
+        //
+        //   is EXPECTED for the current DUT.
+        // ============================================================================
+
+
+        // ----------------------------------------------------------------------------
+        // Coverage hit counters
+        // ----------------------------------------------------------------------------
+
+        int unsigned apb_setup_hits             = 0;
+        int unsigned apb_access_hits            = 0;
+        int unsigned apb_setup_access_hits      = 0;
+
+        int unsigned apb_complete_hits          = 0;
+        int unsigned apb_read_complete_hits     = 0;
+        int unsigned apb_write_complete_hits    = 0;
+
+        int unsigned apb_back_to_back_hits      = 0;
+        int unsigned apb_wait_state_hits        = 0;
+
+        int unsigned apb_pslverr_hits           = 0;
+
+        int unsigned apb_write_strobe_hits      = 0;
+        int unsigned apb_partial_strobe_hits    = 0;
+
+
+        // ============================================================================
+        // 1. APB SETUP phase observed
+        //
+        // SETUP:
+        //     PSEL    = 1
+        //     PENABLE = 0
+        // ============================================================================
+
+        c_apb_setup_seen:
+        cover property (
+            @(posedge pclk_i)
+            disable iff (!presetn_i)
+
+            psel_i && !penable_i
+        )
+        begin
+            apb_setup_hits++;
+        end
+
+
+        // ============================================================================
+        // 2. APB ACCESS phase observed
+        //
+        // ACCESS:
+        //     PSEL    = 1
+        //     PENABLE = 1
+        // ============================================================================
+
+        c_apb_access_seen:
+        cover property (
+            @(posedge pclk_i)
+            disable iff (!presetn_i)
+
+            psel_i && penable_i
+        )
+        begin
+            apb_access_hits++;
+        end
+
+
+        // ============================================================================
+        // 3. Complete SETUP -> ACCESS sequence observed
+        //
+        //         cycle N       cycle N+1
+        //         SETUP   ->     ACCESS
+        //
+        // PSEL      1              1
+        // PENABLE   0              1
+        // ============================================================================
+
+        c_apb_setup_to_access_seen:
+        cover property (
+            @(posedge pclk_i)
+            disable iff (!presetn_i)
+
+            (psel_i && !penable_i)
+            ##1
+            (psel_i && penable_i)
+        )
+        begin
+            apb_setup_access_hits++;
+        end
+
+
+        // ============================================================================
+        // 4. Completed APB transfer observed
+        //
+        // Transfer completion:
+        //     PSEL    = 1
+        //     PENABLE = 1
+        //     PREADY  = 1
+        // ============================================================================
+
+        c_apb_transfer_complete_seen:
+        cover property (
+            @(posedge pclk_i)
+            disable iff (!presetn_i)
+
+            psel_i &&
+            penable_i &&
+            pready_o
+        )
+        begin
+            apb_complete_hits++;
+        end
+
+
+        // ============================================================================
+        // 5. Completed APB READ observed
+        // ============================================================================
+
+        c_apb_read_complete_seen:
+        cover property (
+            @(posedge pclk_i)
+            disable iff (!presetn_i)
+
+            psel_i     &&
+            penable_i  &&
+            pready_o   &&
+            !pwrite_i
+        )
+        begin
+            apb_read_complete_hits++;
+        end
+
+
+        // ============================================================================
+        // 6. Completed APB WRITE observed
+        // ============================================================================
+
+        c_apb_write_complete_seen:
+        cover property (
+            @(posedge pclk_i)
+            disable iff (!presetn_i)
+
+            psel_i     &&
+            penable_i  &&
+            pready_o   &&
+            pwrite_i
+        )
+        begin
+            apb_write_complete_hits++;
+        end
+
+
+        // ============================================================================
+        // 7. Back-to-back APB transfer observed
+        //
+        // Transfer #1 completes:
+        //
+        //     PSEL=1 PENABLE=1 PREADY=1
+        //
+        // Next cycle immediately becomes SETUP for transfer #2:
+        //
+        //     PSEL=1 PENABLE=0
+        //
+        // PSEL is allowed to stay HIGH.
+        // PENABLE must return LOW for the next SETUP.
+        // ============================================================================
+
+        c_apb_back_to_back_seen:
+        cover property (
+            @(posedge pclk_i)
+            disable iff (!presetn_i)
+
+            (
+                psel_i &&
+                penable_i &&
+                pready_o
+            )
+            ##1
+            (
+                psel_i &&
+                !penable_i
+            )
+        )
+        begin
+            apb_back_to_back_hits++;
+        end
+
+
+        // ============================================================================
+        // 8. APB wait state observed
+        //
+        // ACCESS:
+        //     PSEL    = 1
+        //     PENABLE = 1
+        //     PREADY  = 0
+        //
+        // Current UART DUT is zero-wait, so this coverage is expected to remain 0.
+        // ============================================================================
+
+        c_apb_wait_state_seen:
+        cover property (
+            @(posedge pclk_i)
+            disable iff (!presetn_i)
+
+            psel_i &&
+            penable_i &&
+            !pready_o
+        )
+        begin
+            apb_wait_state_hits++;
+        end
+
+
+        // ============================================================================
+        // 9. PSLVERR response observed
+        //
+        // APB error response is meaningful at completed ACCESS:
+        //
+        //     PSEL    = 1
+        //     PENABLE = 1
+        //     PREADY  = 1
+        //     PSLVERR = 1
+        //
+        // apb_unsupported_access_test should hit this.
+        // ============================================================================
+
+        c_apb_pslverr_seen:
+        cover property (
+            @(posedge pclk_i)
+            disable iff (!presetn_i)
+
+            psel_i      &&
+            penable_i   &&
+            pready_o    &&
+            pslverr_o
+        )
+        begin
+            apb_pslverr_hits++;
+        end
+
+
+        // ============================================================================
+        // 10. APB4 write strobe observed
+        //
+        // Confirms that PSTRB is actually used during APB writes.
+        // ============================================================================
+
+        c_apb_write_strobe_seen:
+        cover property (
+            @(posedge pclk_i)
+            disable iff (!presetn_i)
+
+            psel_i            &&
+            penable_i         &&
+            pready_o          &&
+            pwrite_i          &&
+            (pstrb_i != 4'b0000)
+        )
+        begin
+            apb_write_strobe_hits++;
+        end
+
+
+        // ============================================================================
+        // 11. Partial-byte write strobe observed
+        //
+        // Full 32-bit write:
+        //     PSTRB = 1111
+        //
+        // Partial write examples:
+        //     0001
+        //     0010
+        //     0011
+        //     ...
+        //
+        // This project frequently uses 0001 for byte-wide UART registers.
+        // ============================================================================
+
+        c_apb_partial_strobe_seen:
+        cover property (
+            @(posedge pclk_i)
+            disable iff (!presetn_i)
+
+            psel_i             &&
+            penable_i          &&
+            pready_o           &&
+            pwrite_i           &&
+            (pstrb_i != 4'b0000) &&
+            (pstrb_i != 4'b1111)
+        )
+        begin
+            apb_partial_strobe_hits++;
+        end
+
+
+        // ============================================================================
+        // APB4 SVA COVERAGE SUMMARY
+        // ============================================================================
+
+        final begin
+
+            `uvm_info(
+                "APB_SVA_COV",
+                $sformatf(
+                    "SETUP observed: hits=%0d",
+                    apb_setup_hits
+                ),
+                UVM_LOW
+            )
+
+            `uvm_info(
+                "APB_SVA_COV",
+                $sformatf(
+                    "ACCESS observed: hits=%0d",
+                    apb_access_hits
+                ),
+                UVM_LOW
+            )
+
+            `uvm_info(
+                "APB_SVA_COV",
+                $sformatf(
+                    "SETUP->ACCESS sequence: hits=%0d",
+                    apb_setup_access_hits
+                ),
+                UVM_LOW
+            )
+
+            `uvm_info(
+                "APB_SVA_COV",
+                $sformatf(
+                    "Completed transfers: total=%0d read=%0d write=%0d",
+                    apb_complete_hits,
+                    apb_read_complete_hits,
+                    apb_write_complete_hits
+                ),
+                UVM_LOW
+            )
+
+            `uvm_info(
+                "APB_SVA_COV",
+                $sformatf(
+                    "Back-to-back transfers: hits=%0d",
+                    apb_back_to_back_hits
+                ),
+                UVM_LOW
+            )
+
+            `uvm_info(
+                "APB_SVA_COV",
+                $sformatf(
+                    "Wait states: hits=%0d (0 expected for zero-wait UART APB slave)",
+                    apb_wait_state_hits
+                ),
+                UVM_LOW
+            )
+
+            `uvm_info(
+                "APB_SVA_COV",
+                $sformatf(
+                    "PSLVERR completed transfers: hits=%0d",
+                    apb_pslverr_hits
+                ),
+                UVM_LOW
+            )
+
+            `uvm_info(
+                "APB_SVA_COV",
+                $sformatf(
+                    "APB4 PSTRB writes: hits=%0d partial_write_hits=%0d",
+                    apb_write_strobe_hits,
+                    apb_partial_strobe_hits
+                ),
+                UVM_LOW
+            )
+
+        end
+
     // ============================================================
     // Cover: RX overrun
     // ============================================================
@@ -659,9 +1379,14 @@ module uart_assertions (
             UVM_LOW
         )
 
-
-
-
+        `uvm_info(
+            "SVA_SUMMARY",
+            $sformatf(
+                "APB4 protocol SVA: fails=%0d",
+                apb_protocol_fail_count
+            ),
+            UVM_LOW
+        )
 
     end
 
